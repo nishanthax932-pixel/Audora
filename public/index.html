@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="A private, intelligent workspace." />
+    <title>AI workspace</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-top"><a class="brand" href="/" aria-label="Home"><span class="orb"></span><span data-brand>Audora</span></a><button class="icon-button mobile-only" id="close-sidebar" aria-label="Close menu">×</button></div>
+        <button class="new-chat" id="new-chat"><span>＋</span> New chat</button>
+        <nav id="history" aria-label="Chat history"><p class="nav-label">RECENT</p></nav>
+        <div class="sidebar-footer"><button class="workspace"><span class="workspace-mark" data-brand-initial>A</span><span><b data-brand>Audora</b><small data-tagline>Your intelligent workspace</small></span><span>···</span></button></div>
+      </aside>
+      <main class="workspace-main">
+        <header class="topbar"><button class="icon-button mobile-only" id="open-sidebar" aria-label="Open menu">☰</button><div class="model-menu"><select id="model-select" aria-label="Choose model"></select><span>⌄</span></div><div class="topbar-actions"><button class="icon-button" id="theme-toggle" aria-label="Toggle theme">◐</button><button class="profile" aria-label="User profile">U</button></div></header>
+        <section class="chat-stage" id="chat-stage" aria-label="Chat with assistant">
+          <div class="empty-state" id="empty-state"><div class="big-orb">✦</div><h1 id="welcome-heading">How can I help you?</h1><p>Ask, create, analyze, or explore anything.</p><div class="suggestions"><button>Help me plan a project</button><button>Explain a complex idea</button><button>Write and improve text</button></div></div>
+          <div class="conversation" id="conversation" aria-live="polite"></div>
+        </section>
+        <div class="composer-wrap"><form id="chat-form" class="composer"><label class="sr-only" for="prompt">Message the assistant</label><textarea id="prompt" rows="1" maxlength="8000" placeholder="Message Audora" required></textarea><button type="submit" aria-label="Send message"><span>↑</span></button></form><p class="hint"><span data-brand>Audora</span> can make mistakes. Check important info.</p></div>
+      </main>
+    </div>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
