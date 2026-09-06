@@ -5,14 +5,16 @@
   "description": "Audora — an online, configurable AI assistant.",
   "type": "module",
   "scripts": {
-    "start": "node --env-file-if-exists=.env server.js",
-    "dev": "node --env-file-if-exists=.env --watch server.js",
+    "start": "node -r dotenv/config server.js",
+    "dev": "node -r dotenv/config --watch server.js",
+    "build": "node --check server.js && node --check public/app.js",
     "test": "node --test"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=18"
   },
   "dependencies": {
+    "dotenv": "^16.6.1",
     "express": "^5.1.0"
   }
 }

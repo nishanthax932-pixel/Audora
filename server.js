@@ -23,9 +23,9 @@ function getSettings(environment = process.env) {
     accentColor: /^#[0-9a-fA-F]{6}$/.test(environment.AUDORA_ACCENT_COLOR || "") ? environment.AUDORA_ACCENT_COLOR : "#10a37f",
     welcomeMessage: (environment.AUDORA_WELCOME_MESSAGE || "How can I help you today?").slice(0, 160),
     models: models.length ? models : [{ id: fallbackModel, label: "Audora Core" }],
-    provider: environment.AUDORA_PROVIDER === "ollama" ? "ollama" : "openai",
+    provider: environment.AUDORA_PROVIDER === "ollama" ? "ollama" : "compatible",
     apiKey: environment.AUDORA_API_KEY,
-    apiUrl: environment.AUDORA_PROVIDER === "ollama" ? (environment.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat") : (environment.AUDORA_API_URL || "https://api.openai.com/v1/chat/completions"),
+    apiUrl: environment.AUDORA_PROVIDER === "ollama" ? (environment.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat") : environment.AUDORA_API_URL,
     timeoutMs: Math.min(Math.max(Number(environment.AUDORA_REQUEST_TIMEOUT_MS || 60000), 1000), 120000),
     rateLimitMax: Math.min(Math.max(Number(environment.AUDORA_RATE_LIMIT_MAX || 30), 1), 10000),
     rateLimitWindowMs: Math.min(Math.max(Number(environment.AUDORA_RATE_LIMIT_WINDOW_MS || 60000), 1000), 3600000)
@@ -75,13 +75,13 @@ export function createApp(environment = process.env) {
     const model = settings.models.find((candidate) => candidate.id === requestedModel) || settings.models[0];
     if (!validMessages(messages) || messages.at(-1)?.role !== "user" || !messages.at(-1).content.trim()) return response.status(400).json({ error: "Provide 1–40 user or assistant messages, each up to 12,000 characters." });
     if (requestedModel && !settings.models.some((candidate) => candidate.id === requestedModel)) return response.status(400).json({ error: "The selected model is not available for this workspace." });
-    if (settings.provider === "openai" && !settings.apiKey) return response.status(503).json({ error: "Audora needs AUDORA_API_KEY for the configured hosted provider. Or set AUDORA_PROVIDER=ollama to run a local model without a cloud API key." });
+    if (settings.provider === "compatible" && (!settings.apiKey || !settings.apiUrl)) return response.status(503).json({ error: "Audora needs AUDORA_API_URL and AUDORA_API_KEY for the configured hosted provider. Or set AUDORA_PROVIDER=ollama to run a local model without a cloud API key." });
 
     const aborter = new AbortController();
     const timer = setTimeout(() => aborter.abort(), settings.timeoutMs);
     try {
       const headers = { "Content-Type": "application/json" };
-      if (settings.provider === "openai") headers.Authorization = `Bearer ${settings.apiKey}`;
+      if (settings.provider === "compatible") headers.Authorization = `Bearer ${settings.apiKey}`;
       const providerBody = settings.provider === "ollama"
         ? { model: model.id, messages: [{ role: "system", content: instructions }, ...messages], stream: false, options: { temperature: 0.7 } }
         : { model: model.id, messages: [{ role: "system", content: instructions }, ...messages], temperature: 0.7 };

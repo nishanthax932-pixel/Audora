@@ -36,8 +36,8 @@ model you choose—it is not an AGI.
 
 ### Use a hosted provider
 
-Set `AUDORA_PROVIDER=openai`, configure `AUDORA_API_URL` with an
-OpenAI-compatible chat-completions endpoint, set `AUDORA_API_KEY`, and choose a
+Set `AUDORA_PROVIDER=compatible`, configure `AUDORA_API_URL` with a
+compatible chat-completions endpoint, set `AUDORA_API_KEY`, and choose a
 model through `AUDORA_MODEL`. Keep API keys only in environment variables—never
 in browser code.
 
