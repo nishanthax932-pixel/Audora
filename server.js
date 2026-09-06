@@ -28,7 +28,8 @@ function getSettings(environment = process.env) {
     apiUrl: environment.AUDORA_PROVIDER === "ollama" ? (environment.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat") : environment.AUDORA_API_URL,
     timeoutMs: Math.min(Math.max(Number(environment.AUDORA_REQUEST_TIMEOUT_MS || 60000), 1000), 120000),
     rateLimitMax: Math.min(Math.max(Number(environment.AUDORA_RATE_LIMIT_MAX || 30), 1), 10000),
-    rateLimitWindowMs: Math.min(Math.max(Number(environment.AUDORA_RATE_LIMIT_WINDOW_MS || 60000), 1000), 3600000)
+    rateLimitWindowMs: Math.min(Math.max(Number(environment.AUDORA_RATE_LIMIT_WINDOW_MS || 60000), 1000), 3600000),
+    allowedOrigins: (environment.AUDORA_ALLOWED_ORIGINS || "").split(",").map((origin) => origin.trim()).filter(Boolean)
   };
 }
 
@@ -65,6 +66,17 @@ export function createApp(environment = process.env) {
     response.set({ "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "strict-origin-when-cross-origin", "Cache-Control": "no-store" });
     next();
   });
+  app.use((request, response, next) => {
+    const origin = request.get("Origin");
+    if (origin && settings.allowedOrigins.includes(origin)) {
+      response.setHeader("Access-Control-Allow-Origin", origin);
+      response.setHeader("Vary", "Origin");
+      response.setHeader("Access-Control-Allow-Headers", "Content-Type");
+      response.setHeader("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
+    }
+    if (request.method === "OPTIONS") return response.sendStatus(204);
+    next();
+  });
   app.use(express.static(path.join(dirname, "public")));
 
   app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, models: settings.models.map(({ id, label }) => ({ id, label })) }));
@@ -93,6 +105,8 @@ export function createApp(environment = process.env) {
       return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "The model took too long to respond. Please try again." : settings.provider === "ollama" ? "Audora could not reach Ollama. Start Ollama and pull the model named in .env." : "Audora could not reach its inference provider." });
     } finally { clearTimeout(timer); }
   });
+  app.use("/api", (_request, response) => response.status(404).json({ error: "Audora API route not found." }));
+  app.get("/{*path}", (_request, response) => response.sendFile(path.join(dirname, "public", "index.html")));
   return app;
 }
 

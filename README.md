@@ -16,6 +16,34 @@ npm start
 Open `http://localhost:3000`. Without provider credentials, the interface still
 runs and clearly reports that inference has not yet been configured.
 
+## Deploy without 404 errors
+
+The browser UI and `/api/*` server must be deployed together, or the UI needs
+the URL of a separately deployed Audora API. A static-only host cannot run the
+chat server or Ollama and will return `404` for `/api/config` and `/api/chat`.
+
+### Deploy the full application together
+
+Deploy this repository to any host that runs Node applications, set its start
+command to `npm start`, and expose port `3000`. A container deployment can use:
+
+```bash
+docker build -t audora .
+docker run --env-file .env -p 3000:3000 audora
+```
+
+### Deploy the UI and API separately
+
+Deploy this Node application as the API, then edit `public/runtime-config.js`
+before deploying the `public` directory to a static host:
+
+```js
+window.AUDORA_RUNTIME_CONFIG = { apiBaseUrl: "https://your-audora-api.example" };
+```
+
+Set `AUDORA_ALLOWED_ORIGINS=https://your-static-site.example` on the API. The
+server permits only listed cross-origin browser requests; do not use `*`.
+
 ## Configuration
 
 ### Use Audora with no cloud API key

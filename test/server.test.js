@@ -47,3 +47,11 @@ test("uses a local Ollama model without a cloud API key", { concurrency: false }
     });
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test("returns JSON rather than an HTML page for unknown API routes", async () => {
+  await withServer({}, async (url) => {
+    const response = await fetch(`${url}/api/not-real`);
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "Audora API route not found." });
+  });
+});

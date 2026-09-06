@@ -7,6 +7,8 @@ const history = document.querySelector("#history");
 const messages = [];
 let config = { brandName: "Audora", welcomeMessage: "How can I help you today?", models: [{ id: "audora-core", label: "Audora Core" }] };
 const storageKey = "audora-conversations-v1";
+const apiBaseUrl = String(window.AUDORA_RUNTIME_CONFIG?.apiBaseUrl || "").replace(/\/$/, "");
+const apiUrl = (path) => `${apiBaseUrl}${path}`;
 
 function addMessage(role, content) {
   const article = document.createElement("article");
@@ -39,7 +41,8 @@ function loadConversation() {
 }
 
 async function loadConfig() {
-  const response = await fetch("/api/config");
+  const response = await fetch(apiUrl("/api/config"));
+  if (!response.ok) throw new Error(`The Audora API returned ${response.status}.`);
   config = await response.json();
   document.documentElement.style.setProperty("--accent", config.accentColor);
   document.title = `${config.brandName} — AI workspace`;
@@ -66,7 +69,7 @@ form.addEventListener("submit", async (event) => {
   button.disabled = true;
 
   try {
-    const result = await fetch("/api/chat", {
+    const result = await fetch(apiUrl("/api/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages, model: modelSelect.value })
@@ -90,7 +93,7 @@ document.querySelector("#new-chat").addEventListener("click", () => { messages.l
 document.querySelector("#theme-toggle").addEventListener("click", () => document.documentElement.classList.toggle("light"));
 document.querySelector("#open-sidebar").addEventListener("click", () => document.querySelector(".sidebar").classList.add("open"));
 document.querySelector("#close-sidebar").addEventListener("click", () => document.querySelector(".sidebar").classList.remove("open"));
-loadConfig().catch(() => addMessage("assistant", "The workspace configuration could not be loaded."));
+loadConfig().catch((error) => addMessage("assistant", `Connection problem: ${error.message} Configure runtime-config.js with the URL of your Audora API, or host the UI and API together.`));
 
 prompt.addEventListener("input", () => {
   prompt.style.height = "auto";
