@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Audora, a thoughtful AI assistant." />
+    <title>Audora — Intelligence, made personal</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css" />
+  </head>
+  <body>
+    <main class="shell">
+      <header>
+        <a class="brand" href="/" aria-label="Audora home"><span class="orb"></span> AUDORA</a>
+        <div class="status"><span></span> ONLINE</div>
+      </header>
+      <section class="hero" aria-labelledby="headline">
+        <p class="eyebrow">A NEW KIND OF THINKING PARTNER</p>
+        <h1 id="headline">Meet <em>Audora.</em></h1>
+        <p class="lede">Clear thinking for complicated questions. Built to be useful, candid, and relentlessly curious.</p>
+      </section>
+      <section class="chat-card" aria-label="Chat with Audora">
+        <div class="conversation" id="conversation" aria-live="polite">
+          <article class="message assistant">
+            <div class="avatar">A</div>
+            <div><p class="message-label">AUDORA</p><p>What would you like to explore today?</p></div>
+          </article>
+        </div>
+        <form id="chat-form" class="composer">
+          <label class="sr-only" for="prompt">Message Audora</label>
+          <textarea id="prompt" rows="1" maxlength="8000" placeholder="Ask Audora anything…" required></textarea>
+          <button type="submit" aria-label="Send message">↗</button>
+        </form>
+        <p class="hint">Audora can make mistakes. Verify important information.</p>
+      </section>
+      <section class="principles">
+        <div><span>01</span><strong>Thoughtful by design</strong></div>
+        <div><span>02</span><strong>Honest about uncertainty</strong></div>
+        <div><span>03</span><strong>Built around you</strong></div>
+      </section>
+    </main>
+    <script type="module" src="/app.js"></script>
+  </body>
+</html>
