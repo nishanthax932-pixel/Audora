@@ -29,3 +29,21 @@ test("reports a missing provider key without exposing one", async () => {
     assert.match((await response.json()).error, /AUDORA_API_KEY/);
   });
 });
+
+test("uses a local Ollama model without a cloud API key", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamRequest;
+  globalThis.fetch = async (_url, options) => {
+    upstreamRequest = options;
+    return new Response(JSON.stringify({ message: { content: "Local answer" } }), { status: 200, headers: { "Content-Type": "application/json" } });
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "ollama", AUDORA_MODEL: "local-model" }, async (url) => {
+      const response = await originalFetch(`${url}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ model: "local-model", messages: [{ role: "user", content: "Hello" }] }) });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).message, "Local answer");
+      assert.equal(JSON.parse(upstreamRequest.body).stream, false);
+      assert.equal(upstreamRequest.headers.Authorization, undefined);
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});

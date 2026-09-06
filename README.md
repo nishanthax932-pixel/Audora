@@ -18,8 +18,26 @@ runs and clearly reports that inference has not yet been configured.
 
 ## Configuration
 
-Audora sends chat-completions requests to `AUDORA_API_URL`. Configure it with an
-OpenAI-compatible hosted model provider, set `AUDORA_API_KEY`, and choose a
+### Use Audora with no cloud API key
+
+Audora supports local Ollama inference. Install [Ollama](https://ollama.com),
+then run the following once before starting Audora:
+
+```bash
+ollama pull qwen3:8b
+ollama serve
+npm start
+```
+
+The supplied `.env.example` uses `AUDORA_PROVIDER=ollama`, so no cloud API key
+is needed. Your prompts stay on the machine running Ollama. This is still a
+real language model, but its quality and hardware requirements depend on the
+model you choose—it is not an AGI.
+
+### Use a hosted provider
+
+Set `AUDORA_PROVIDER=openai`, configure `AUDORA_API_URL` with an
+OpenAI-compatible chat-completions endpoint, set `AUDORA_API_KEY`, and choose a
 model through `AUDORA_MODEL`. Keep API keys only in environment variables—never
 in browser code.
 
