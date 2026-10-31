@@ -3,6 +3,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+const FREE_API_URL = "https://text.pollinations.ai/openai";
+const FREE_MODEL = "openai";
+
 function readModels(value, fallbackModel) {
   if (!value) return [{ id: fallbackModel, label: "Audora Core" }];
   try {
@@ -14,18 +18,30 @@ function readModels(value, fallbackModel) {
   return value.split(",").map((id) => id.trim()).filter(Boolean).map((id) => ({ id, label: id }));
 }
 
+function resolveProvider(environment) {
+  const requested = environment.AUDORA_PROVIDER;
+  if (["ollama", "compatible", "free"].includes(requested)) return requested;
+  if (requested) return "compatible";
+  return environment.AUDORA_API_KEY && environment.AUDORA_API_URL ? "compatible" : "free";
+}
+
 function getSettings(environment = process.env) {
-  const fallbackModel = environment.AUDORA_MODEL || "gpt-4.1-mini";
+  const provider = resolveProvider(environment);
+  const fallbackModel = environment.AUDORA_MODEL || (provider === "free" ? FREE_MODEL : "gpt-4.1-mini");
   const models = readModels(environment.AUDORA_MODELS, fallbackModel);
   return {
     brandName: (environment.AUDORA_BRAND_NAME || "Audora").slice(0, 80),
     tagline: (environment.AUDORA_BRAND_TAGLINE || "Your intelligent workspace").slice(0, 160),
-    accentColor: /^#[0-9a-fA-F]{6}$/.test(environment.AUDORA_ACCENT_COLOR || "") ? environment.AUDORA_ACCENT_COLOR : "#10a37f",
+    accentColor: /^#[0-9a-fA-F]{6}$/.test(environment.AUDORA_ACCENT_COLOR || "") ? environment.AUDORA_ACCENT_COLOR : "#805ad5",
     welcomeMessage: (environment.AUDORA_WELCOME_MESSAGE || "How can I help you today?").slice(0, 160),
     models: models.length ? models : [{ id: fallbackModel, label: "Audora Core" }],
-    provider: environment.AUDORA_PROVIDER === "ollama" ? "ollama" : "compatible",
+    provider,
     apiKey: environment.AUDORA_API_KEY,
-    apiUrl: environment.AUDORA_PROVIDER === "ollama" ? (environment.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat") : environment.AUDORA_API_URL,
+    apiUrl: provider === "ollama"
+      ? (environment.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat")
+      : provider === "free"
+        ? (environment.AUDORA_FREE_API_URL || FREE_API_URL)
+        : environment.AUDORA_API_URL,
     timeoutMs: Math.min(Math.max(Number(environment.AUDORA_REQUEST_TIMEOUT_MS || 60000), 1000), 120000),
     rateLimitMax: Math.min(Math.max(Number(environment.AUDORA_RATE_LIMIT_MAX || 30), 1), 10000),
     rateLimitWindowMs: Math.min(Math.max(Number(environment.AUDORA_RATE_LIMIT_WINDOW_MS || 60000), 1000), 3600000),
@@ -80,14 +96,20 @@ export function createApp(environment = process.env) {
   app.use(express.static(path.join(dirname, "public")));
 
   app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, models: settings.models.map(({ id, label }) => ({ id, label })) }));
-  app.get("/api/health", (_request, response) => response.json({ name: settings.brandName, status: "ready", provider: settings.provider, providerConfigured: settings.provider === "ollama" || Boolean(settings.apiKey), models: settings.models.length }));
+  app.get("/api/health", (_request, response) => response.json({ name: settings.brandName, status: "ready", provider: settings.provider, providerConfigured: settings.provider !== "compatible" || Boolean(settings.apiKey), models: settings.models.length }));
 
+  let lastFreeCallAt = 0;
   app.post("/api/chat", createRateLimiter(settings), async (request, response) => {
     const { messages, model: requestedModel } = request.body || {};
     const model = settings.models.find((candidate) => candidate.id === requestedModel) || settings.models[0];
     if (!validMessages(messages) || messages.at(-1)?.role !== "user" || !messages.at(-1).content.trim()) return response.status(400).json({ error: "Provide 1–40 user or assistant messages, each up to 12,000 characters." });
     if (requestedModel && !settings.models.some((candidate) => candidate.id === requestedModel)) return response.status(400).json({ error: "The selected model is not available for this workspace." });
     if (settings.provider === "compatible" && (!settings.apiKey || !settings.apiUrl)) return response.status(503).json({ error: "Audora needs AUDORA_API_URL and AUDORA_API_KEY for the configured hosted provider. Or set AUDORA_PROVIDER=ollama to run a local model without a cloud API key." });
+    if (settings.provider === "free") {
+      const freeMinIntervalMs = Math.min(Math.max(Number(environment.AUDORA_FREE_MIN_INTERVAL_MS || 45000), 1000), 600000);
+      if (Date.now() - lastFreeCallAt < freeMinIntervalMs) return response.status(429).json({ error: "The free model tier allows about one reply per minute. Please wait a moment and send again." });
+      lastFreeCallAt = Date.now();
+    }
 
     const aborter = new AbortController();
     const timer = setTimeout(() => aborter.abort(), settings.timeoutMs);
@@ -99,10 +121,18 @@ export function createApp(environment = process.env) {
         : { model: model.id, messages: [{ role: "system", content: instructions }, ...messages], temperature: 0.7 };
       const providerResponse = await fetch(settings.apiUrl, { method: "POST", signal: aborter.signal, headers, body: JSON.stringify(providerBody) });
       const payload = await providerResponse.json().catch(() => ({}));
-      if (!providerResponse.ok) return response.status(providerResponse.status >= 400 && providerResponse.status < 600 ? providerResponse.status : 502).json({ error: payload.error?.message || "The inference provider could not complete this request." });
+      if (!providerResponse.ok) {
+        const status = providerResponse.status >= 400 && providerResponse.status < 600 ? providerResponse.status : 502;
+        if (settings.provider === "free") {
+          const busy = providerResponse.status === 429 || providerResponse.status === 503;
+          return response.status(busy ? 429 : 502).json({ error: busy ? "The free model tier is busy right now. Please try again in a moment." : "The free model service could not complete this request. Please try again in a moment." });
+        }
+        return response.status(status).json({ error: payload.error?.message || "The inference provider could not complete this request." });
+      }
       return response.json({ message: settings.provider === "ollama" ? (payload.message?.content || "The local model returned an empty response.") : (payload.choices?.[0]?.message?.content || "The model returned an empty response."), model: model.label });
     } catch (error) {
-      return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "The model took too long to respond. Please try again." : settings.provider === "ollama" ? "Audora could not reach Ollama. Start Ollama and pull the model named in .env." : "Audora could not reach its inference provider." });
+      const unreachable = settings.provider === "ollama" ? "Audora could not reach Ollama. Start Ollama and pull the model named in .env." : settings.provider === "free" ? "Audora could not reach the free model service. Please try again in a moment." : "Audora could not reach its inference provider.";
+      return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "The model took too long to respond. Please try again." : unreachable });
     } finally { clearTimeout(timer); }
   });
   app.use("/api", (_request, response) => response.status(404).json({ error: "Audora API route not found." }));

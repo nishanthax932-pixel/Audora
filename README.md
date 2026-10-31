@@ -8,13 +8,30 @@ for a custom model product—not a claim of artificial general intelligence.
 
 ```bash
 npm install
-cp .env.example .env
-# Add an API key and compatible model name to .env (loaded automatically)
 npm start
 ```
 
-Open `http://localhost:3000`. Without provider credentials, the interface still
-runs and clearly reports that inference has not yet been configured.
+Open `http://localhost:3000` and chat. With no configuration at all, Audora
+answers through a free shared model tier so the app works out of the box at
+zero cost. That tier is rate-limited, can be busy at peak times, and messages
+leave your machine to an outside free service - do not discuss secrets on it,
+and expect occasional "free tier is busy" replies.
+
+## Test
+
+```bash
+npm install
+npm test
+```
+
+Runs the server test suite (validation, rate limiting, provider behavior,
+error handling). No API key is needed - provider calls are simulated in tests.
+
+For your own provider, copy `.env.example` to `.env` and either point Audora at
+an OpenAI-compatible hosted provider (`AUDORA_PROVIDER=compatible`,
+`AUDORA_API_URL`, `AUDORA_API_KEY`) or run a local model with Ollama
+(`AUDORA_PROVIDER=ollama`, no cloud key needed). Keep API keys only in
+environment variables - never in browser code.
 
 ## Deploy without 404 errors
 
