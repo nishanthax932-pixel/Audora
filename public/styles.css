@@ -78,3 +78,7 @@
 
 
 .image-output{max-width:800px;margin:20px auto 150px}.image-output[hidden]{display:none}.image-output img{display:block;width:100%;max-height:640px;object-fit:contain;border-radius:14px;border:1px solid #444}.image-output p{color:var(--muted);font-size:13px}.image-output button{margin-top:8px;border:1px solid #555;background:transparent;color:var(--text);padding:8px 12px;border-radius:8px;cursor:pointer}
+
+#search-mode[aria-pressed="true"]{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+.message-content a{color:#78b8ff;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
+.light .message-content a{color:#1459a6}
