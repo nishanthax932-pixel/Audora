@@ -16,5 +16,10 @@
   "dependencies": {
     "dotenv": "^16.6.1",
     "express": "^5.1.0"
+  },
+  "overrides": {
+    "body-parser": "2.4.0",
+    "proxy-addr": "2.0.8",
+    "qs": "6.16.1"
   }
 }
