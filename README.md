@@ -105,7 +105,7 @@ See [the everyday user guide](docs/USER-GUIDE.md) for first-time setup status, e
 
 ## Free hosted deployment
 
-See [free hosting](docs/FREE-HOSTING.md) for a Render Free blueprint that hosts the Audora interface and API gateway with a public HTTPS URL. The model runtime, web search service, and image-generation engine remain separate services and must be configured independently.
+See [free hosting](docs/FREE-HOSTING.md) for a Render Free blueprint that hosts the Audora interface and API gateway with a public HTTPS URL. The model runtime, web search service, and image-generation engine remain separate services and must be configured independently. See [hosting options](docs/HOSTING-OPTIONS.md) for a practical PC + Cloudflare Tunnel setup and the Oracle Always Free CPU alternative.
 
 ## Deployment and configuration doctor
 
