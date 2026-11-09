@@ -127,3 +127,17 @@ open-weight base model, curate consented task data, fine-tune and evaluate it,
 then deploy the resulting checkpoint behind this service. Training a
 frontier-scale foundation model from scratch requires large-scale data,
 specialized GPU infrastructure, and rigorous safety evaluation.
+
+## Image generation
+
+The composer has an image mode. It uses the Pollinations image API through the
+server-side `/api/image` proxy. Image generation is disabled until the owner
+sets `AUDORA_IMAGE_API_KEY` in the deployment's secret environment. Create a
+key at [Pollinations](https://enter.pollinations.ai); never put it in browser
+code or commit it to Git. The default image model can be changed with
+`AUDORA_IMAGE_MODEL`. Provider usage may consume credits.
+
+The chat model currently returns normal text completions. Web search and
+multi-step function/tool calling are not yet wired into the request lifecycle.
+For reasoning questions, ask for a concise explanation or visible solution
+steps; the app does not expose private internal chain-of-thought.
