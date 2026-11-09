@@ -265,3 +265,32 @@ test("streams compatible-provider tokens as server-sent events", { concurrency: 
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("uses configured SearXNG search and filters unsafe result URLs", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamUrl;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("http://search.local/search")) {
+      upstreamUrl = new URL(String(url));
+      return new Response(JSON.stringify({ results: [
+        { title: "Audora docs", url: "https://example.test/audora", content: "Official documentation" },
+        { title: "Unsafe result", url: "javascript:alert(1)", content: "Must be removed" }
+      ] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_SEARCH_URL: "http://search.local/search" }, async (url) => {
+      const response = await originalFetch(`${url}/api/search?q=Audora%20AI`);
+      assert.equal(response.status, 200);
+      assert.equal(upstreamUrl.searchParams.get("q"), "Audora AI");
+      assert.equal(upstreamUrl.searchParams.get("format"), "json");
+      const payload = await response.json();
+      assert.equal(payload.results.length, 1);
+      assert.equal(payload.results[0].url, "https://example.test/audora");
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
