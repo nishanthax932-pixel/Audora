@@ -225,3 +225,28 @@ test("validates image prompts before provider calls", async () => {
     assert.equal(response.status, 400);
   });
 });
+
+
+test("proxies generated image bytes using the server-side image key", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamUrl;
+  let upstreamHeaders;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://gen.pollinations.ai/image/")) {
+      upstreamUrl = String(url);
+      upstreamHeaders = options.headers;
+      return new Response(new Uint8Array([255, 216, 255, 217]), { status: 200, headers: { "Content-Type": "image/jpeg" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_IMAGE_API_KEY: "server-only-test-key" }, async (url) => {
+      const response = await originalFetch(`${url}/api/image`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: "A blue city" }) });
+      assert.equal(response.status, 200);
+      assert.equal(response.headers.get("content-type"), "image/jpeg");
+      assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [255, 216, 255, 217]);
+      assert.match(upstreamUrl, /A%20blue%20city/);
+      assert.equal(upstreamHeaders.Authorization, "Bearer server-only-test-key");
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
