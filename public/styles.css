@@ -129,3 +129,110 @@
 .light .assistant-card p,.light .assistant-intro,.light .assistant-note{color:#666}
 .light .assistant-card-actions button,.light .assistant-secondary{border-color:#ccc}
 @media(max-width:700px){.assistant-select{max-width:112px;font-size:11px}.topbar-actions{gap:5px}#manage-assistants{padding:7px 8px;font-size:11px}.assistant-dialog{padding:17px}}
+
+
+
+/* Audora workspace polish: original ChatGPT-inspired interaction patterns */
+:root{--bg:#212121;--panel:#171717;--soft:#2f2f2f;--text:#ececec;--muted:#a7a7a7;--accent:#10a37f;--line:#343434}
+body{font-family:Arial,Helvetica,sans-serif}
+.sidebar{width:268px;padding:13px 11px 10px;border-right:1px solid #252525}
+.brand{font-size:18px;letter-spacing:-.35px;padding:11px 10px}
+.orb{width:25px;height:25px;border-radius:8px;box-shadow:0 0 20px #10a37f33}
+.new-chat{margin:15px 0 10px;text-align:left;background:#222;border-color:#383838;min-height:42px;font-size:13px}
+.new-chat:hover{background:#2a2a2a;border-color:#555}
+.history-search{margin:0 0 10px;background:#222;border-color:#333;font-size:13px}
+.sidebar-tools{display:grid;gap:3px;margin-bottom:9px}
+.export-chats{margin:0;border-color:transparent;padding:9px 10px;color:#b8b8b8}
+.export-chats:hover{background:#292929}
+#history{overflow-y:auto;min-height:0;flex:1}
+.nav-label{margin:12px 10px 7px;font-size:11px;font-weight:700;letter-spacing:.04em;color:#888}
+.history-row{gap:2px;padding:1px 2px}
+.history-row.active{background:#2b2b2b}
+.history-item{font-size:13px;padding:9px 8px}
+.history-rename,.history-delete{width:25px;height:27px;opacity:0;color:#aaa;border:0;border-radius:6px;background:transparent;cursor:pointer}
+.history-row:hover .history-rename,.history-row:hover .history-delete,.history-row.active .history-rename,.history-row.active .history-delete{opacity:1}
+.history-rename:hover,.history-delete:hover{background:#444;color:#fff}
+.sidebar-footer{border-color:#303030}
+.workspace{padding:9px}
+.workspace:hover{background:#292929}
+.workspace-main{background:var(--bg)}
+.topbar{height:58px;padding:0 24px;border-bottom:1px solid #ffffff08}
+.model-menu select{font-size:15px;font-weight:650;letter-spacing:-.2px}
+.engine-status{font-size:10px}
+.topbar-actions{gap:7px}
+.topbar-actions .icon-button{border-radius:9px;color:#aaa}
+.topbar-actions .icon-button:hover{background:#303030;color:#fff}
+.chat-stage{width:min(100% - 44px,820px);padding-top:54px;padding-bottom:180px}
+.empty-state{padding-top:13vh}
+.big-orb{width:62px;height:62px;border-radius:20px;box-shadow:0 8px 35px #10a37f22}
+.empty-state h1{font-size:32px;letter-spacing:-1px;font-weight:650}
+.empty-state>p{font-size:14px}
+.suggestions{max-width:700px;gap:9px}
+.suggestions button{background:#262626;border-color:#3a3a3a;color:#d1d1d1;font-size:12px;padding:10px 13px;transition:background .15s,border-color .15s}
+.suggestions button:hover{background:#303030;border-color:#5b5b5b}
+.conversation{gap:34px}
+.message{gap:17px;font-size:15px;line-height:1.72}
+.message .avatar{width:30px;height:30px;border-radius:10px}
+.message.user{flex-direction:row;align-items:flex-start}
+.user>div:last-child{background:#303030;padding:11px 15px;border-radius:18px;max-width:min(78%,680px)}
+.message-label{font-size:12px;letter-spacing:.01em;color:#bdbdbd;margin-bottom:7px!important}
+.message-content{font-size:15px;line-height:1.75}
+.message-actions{opacity:.55;transition:opacity .15s}
+.message:hover .message-actions{opacity:1}
+.message-action{font-size:11px;padding:5px 8px}
+.composer-wrap{left:268px;padding:34px max(20px,calc((100% - 820px)/2)) 18px;background:linear-gradient(transparent,var(--bg) 30%)}
+.composer{border-radius:24px;background:#303030;border:1px solid #484848;padding:10px 11px 10px 13px;gap:8px;box-shadow:0 8px 32px #0004}
+.composer:focus-within{border-color:#626262;box-shadow:0 0 0 1px #626262,0 8px 32px #0004}
+.composer textarea{font-size:15px;padding:5px 2px;min-height:34px}
+.composer button{border-radius:50%;width:34px;height:34px}
+.composer #send-button{background:#f1f1f1;color:#171717;border-radius:50%;font-size:18px}
+.composer #send-button:hover{background:#fff;transform:translateY(-1px)}
+.composer .attach-button{width:34px;height:34px;border-radius:50%;font-size:17px!important}
+.composer .attach-button:hover{background:#414141!important}
+.composer .stop-button{border-radius:50%}
+.hint{font-size:10px;margin-top:9px;color:#858585}
+#voice-input.recording{background:#a33b3b!important;border-color:#d65d5d!important;color:#fff!important;animation:audora-pulse 1.1s infinite}
+@keyframes audora-pulse{50%{box-shadow:0 0 0 6px #d65d5d33}}
+.app-notice{border-radius:12px}
+.assistant-dialog{background:#202020;border-color:#3a3a3a}
+.assistant-primary{background:var(--accent)}
+.profile-dialog{background:#202020;border-color:#3a3a3a}
+@media(min-width:701px){.sidebar{height:100vh;position:sticky;top:0}.workspace-main{min-height:100vh}}
+@media(max-width:700px){
+  .sidebar{width:min(86vw,300px);box-shadow:20px 0 60px #0008;border-right:1px solid #333}
+  .sidebar.open:after{content:"";position:fixed;inset:0 -100vw 0 100%;background:#0008;z-index:-1}
+  .composer-wrap{left:0;padding:24px 10px max(12px,env(safe-area-inset-bottom));}
+  .chat-stage{width:calc(100% - 22px);padding:35px 0 170px}
+  .topbar{height:54px;padding:0 10px;gap:5px}
+  .engine-status{max-width:34vw;font-size:9px}
+  .topbar-actions{gap:2px}
+  .topbar-actions .icon-button{width:30px}
+  .empty-state{padding-top:10vh}
+  .empty-state h1{font-size:26px}
+  .suggestions{justify-content:flex-start;overflow-x:auto;flex-wrap:nowrap;padding:4px 1px 8px;scrollbar-width:none}
+  .suggestions button{white-space:nowrap;flex:none}
+  .message{gap:10px;font-size:14px}
+  .message-content{font-size:14px}
+  .user>div:last-child{max-width:88%;padding:10px 12px}
+  .composer{gap:5px;padding:8px;border-radius:20px}
+  .composer .attach-button{width:31px;height:31px;font-size:15px!important}
+  .composer #send-button,.composer .stop-button,.composer #voice-input{width:31px;height:31px}
+  .composer textarea{font-size:16px;min-width:0}
+  .hint{font-size:9px}
+  .assistant-dialog{width:calc(100vw - 20px);max-height:88dvh}
+}
+.light .sidebar{border-color:#e8e8e8}
+.light .new-chat,.light .history-search{background:#fff;border-color:#ddd}
+.light .new-chat:hover,.light .export-chats:hover,.light .workspace:hover{background:#eee}
+.light .history-row.active,.light .history-row:hover{background:#eee}
+.light .history-rename:hover,.light .history-delete:hover{background:#ddd;color:#222}
+.light .topbar{border-color:#eee}
+.light .topbar-actions .icon-button:hover{background:#eee;color:#222}
+.light .suggestions button{background:#fff;border-color:#ddd;color:#444}
+.light .suggestions button:hover{background:#f1f1f1}
+.light .user>div:last-child{background:#eee}
+.light .composer{background:#fff;border-color:#ddd;box-shadow:0 8px 28px #0000000c}
+.light .composer:focus-within{border-color:#aaa;box-shadow:0 0 0 1px #aaa}
+.light .composer .attach-button{color:#333!important;border-color:#ccc!important}
+.light .composer .attach-button:hover{background:#eee!important}
+.light .composer #send-button{background:#222;color:#fff}
