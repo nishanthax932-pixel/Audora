@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: audora-workspace
+    runtime: node
+    plan: free
+    region: singapore
+    branch: main
+    buildCommand: npm ci
+    startCommand: npm start
+    healthCheckPath: /api/health
+    autoDeploy: true
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: AUDORA_BRAND_NAME
+        value: Audora
+      - key: AUDORA_BRAND_TAGLINE
+        value: Your intelligent workspace
