@@ -7,3 +7,7 @@ training/data/train.jsonl
 training/output/
 __pycache__/
 *.pyc
+
+# Model checkpoints and generated artifacts (never commit large weights)
+models/
+image/models/
