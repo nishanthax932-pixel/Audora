@@ -26,3 +26,8 @@
 .light .message-action:hover{background:#e7e7e7}
 .light .app-notice{background:#fff6e7;color:#694b1b}
 @media(max-width:700px){.history-search{font-size:16px}.composer-wrap{padding-left:12px;padding-right:12px}.message-actions{margin-top:5px}}
+
+.export-chats{width:100%;margin:0 0 14px;padding:8px 10px;border:1px solid #393939;border-radius:8px;background:transparent;color:#bdbdbd;text-align:left;font-size:12px;cursor:pointer}
+.export-chats:hover{background:#292929;color:var(--text)}
+.light .export-chats{border-color:#ddd;color:#555}
+.light .export-chats:hover{background:#eee;color:#222}
