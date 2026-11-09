@@ -184,15 +184,15 @@ function renderInline(parent, value) {
     if (match.index > cursor) parent.append(document.createTextNode(value.slice(cursor, match.index)));
     const token = match[0];
     if (token.startsWith("[")) {
-      const match = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
-      if (match) {
+      const linkMatch = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+      if (linkMatch) {
         try {
-          const url = new URL(match[2]);
+          const url = new URL(linkMatch[2]);
           if (["http:", "https:"].includes(url.protocol)) {
-            const link = document.createElement("a"); link.href = url.href; link.textContent = match[1];
+            const link = document.createElement("a"); link.href = url.href; link.textContent = linkMatch[1];
             link.target = "_blank"; link.rel = "noopener noreferrer"; parent.append(link);
           }
-        } catch { parent.append(document.createTextNode(match[1])); }
+        } catch { parent.append(document.createTextNode(linkMatch[1])); }
       }
     } else {
       const node = document.createElement(token.startsWith("`") ? "code" : "strong");
