@@ -120,22 +120,44 @@ cooldown, so one visitor may temporarily delay other free-tier visitors.
 Set request/spend limits with your inference provider, use HTTPS, and add monitoring. This application is an AI
 workspace; it does not itself train or constitute an AGI model.
 
-## Building a real custom model
+## Fine-tune an Audora model
 
-The responsible path to a distinct Audora model is to evaluate a suitable
-open-weight base model, curate consented task data, fine-tune and evaluate it,
-then deploy the resulting checkpoint behind this service. Training a
-frontier-scale foundation model from scratch requires large-scale data,
-specialized GPU infrastructure, and rigorous safety evaluation.
+Audora includes a reproducible supervised fine-tuning starter under `training/`.
+It uses an openly available pretrained model plus LoRA adapters (PEFT). The
+base checkpoint is not quantized by this starter: choose a model that fits the
+GPU memory available. LoRA trains a small set of adapter weights while leaving
+the original model weights frozen; it does not create a frontier model from
+scratch.
+
+1. Choose an open-weight base model whose license permits your intended use.
+2. Prepare reviewed, consented examples in JSONL format using
+   `training/data/train.example.jsonl` as the schema.
+3. Create a Python environment and install `training/requirements.txt`.
+4. Set `AUDORA_BASE_MODEL` and `AUDORA_TRAIN_FILE`, then run
+   `python training/train_lora.py`.
+5. Evaluate the adapter on held-out examples before deploying it.
+
+The starter defaults to `Qwen/Qwen2.5-1.5B-Instruct` as a modest example, not
+as a claim that it is the best model. Training requires a compatible GPU and
+enough VRAM for the full-precision/base-precision checkpoint you select.
+No model weights or training run are included in this repository. Do not
+upload private user conversations, secrets, or personal data as training
+examples without explicit permission.
+
+To serve the trained model locally, merge/load the adapter in a compatible
+Transformers runtime or export it to a supported inference format, then point
+Audora at a local OpenAI-compatible inference server. The existing Ollama
+provider remains available for local inference; a LoRA adapter must first be
+converted/merged to a format supported by your chosen Ollama workflow.
 
 ## Image generation
 
-The composer has an image mode. It uses the Pollinations image API through the
-server-side `/api/image` proxy. Image generation is disabled until the owner
-sets `AUDORA_IMAGE_API_KEY` in the deployment's secret environment. Create a
-key at [Pollinations](https://enter.pollinations.ai); never put it in browser
-code or commit it to Git. The default image model can be changed with
-`AUDORA_IMAGE_MODEL`. Provider usage may consume credits.
+Image generation has been removed. Audora does not call Pollinations or another
+third-party image-generation API, and the composer no longer offers image mode.
+An in-house image model is a separate project: it would require selecting an
+open-weight diffusion model, checking its license, fine-tuning it on permitted
+images, and providing GPU inference capacity. Until that exists, image
+generation is intentionally unavailable.
 
 The chat model currently returns normal text completions. Web search and
 multi-step function/tool calling are not yet wired into the request lifecycle.
