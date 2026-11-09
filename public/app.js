@@ -171,7 +171,7 @@ function renderChat() {
 }
 
 function renderInline(parent, value) {
-  const pattern = /(`[^`]+`|\\*\\*[^*]+\\*\\*)/g;
+  const pattern = /(`[^`]+`|\*\*[^*]+\*\*)/g;
   let cursor = 0;
   for (const match of value.matchAll(pattern)) {
     if (match.index > cursor) parent.append(document.createTextNode(value.slice(cursor, match.index)));
@@ -186,7 +186,7 @@ function renderInline(parent, value) {
 
 function renderRichText(parent, content) {
   parent.replaceChildren();
-  const lines = content.split("\\n");
+  const lines = content.split("\n");
   let list = null;
   let code = null;
   for (const line of lines) {
@@ -196,15 +196,15 @@ function renderRichText(parent, content) {
       list = null;
       continue;
     }
-    if (code) { code._block.append(document.createTextNode(`${line}\\n`)); continue; }
-    const item = line.match(/^\\s*[-*]\\s+(.+)$/);
+    if (code) { code._block.append(document.createTextNode(`${line}\n`)); continue; }
+    const item = line.match(/^\s*[-*]\s+(.+)$/);
     if (item) {
       if (!list) { list = document.createElement("ul"); parent.append(list); }
       const li = document.createElement("li"); renderInline(li, item[1]); list.append(li); continue;
     }
     list = null;
     if (!line.trim()) continue;
-    const heading = line.match(/^(#{1,3})\\s+(.+)$/);
+    const heading = line.match(/^(#{1,3})\s+(.+)$/);
     const node = document.createElement(heading ? `h${heading[1].length + 2}` : "p");
     renderInline(node, heading ? heading[2] : line);
     parent.append(node);
@@ -268,7 +268,7 @@ async function sendMessage(content) {
   const chat = currentChat();
   if (!chat || isGenerating || !content.trim()) return;
   chat.model = modelSelect.value;
-  const fileContext = attachments.map((file) => `\\n\\n[Attached file: ${file.name}]\\n${file.content}`).join("");
+  const fileContext = attachments.map((file) => `\n\n[Attached file: ${file.name}]\n${file.content}`).join("");
   const fullContent = `${content.trim()}${fileContext}`.slice(0, 12000);
   chat.messages.push({ role: "user", content: fullContent });
   attachments = [];
