@@ -33,8 +33,8 @@ def read_messages(record, line_number):
             or not isinstance(message.get("content"), str)
         ):
             raise ValueError(f"Line {line_number}: invalid message")
-    if not any(message["role"] == "assistant" for message in messages):
-        raise ValueError(f"Line {line_number}: at least one assistant response is required")
+    if messages[-1]["role"] != "assistant":
+        raise ValueError(f"Line {line_number}: each training conversation must end with an assistant response")
     return messages
 
 
