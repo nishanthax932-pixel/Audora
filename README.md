@@ -99,6 +99,12 @@ Restart Audora. The search button appears in the composer when the endpoint is c
 
 See `image/README.md` to install the local Diffusers service and provide an already-downloaded, properly licensed SDXL checkpoint. The Node API proxies only to the configured private image service. The model server loads from disk with `local_files_only=True`; it does not download weights or call Pollinations/other hosted image providers. A CUDA GPU and substantial VRAM are required. Do not expose the image service publicly.
 
+## Deployment and configuration doctor
+
+See [the deployment guide](docs/DEPLOYMENT.md) for the Docker Compose GPU stack, model setup, optional services, and production security notes. Copy `.env.compose.example` to `.env` when using Compose. Run `npm run doctor` to check local configuration and reveal remaining infrastructure gaps; this check does not claim that a model or GPU is online.
+
+See the [release acceptance checklist](docs/RELEASE-CHECKLIST.md) before a public launch.
+
 ## Tests and production
 
 ```bash
