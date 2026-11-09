@@ -1,7 +1,7 @@
 const button = document.querySelector("#image-mode");
 const output = document.querySelector("#image-output");
 const promptInput = document.querySelector("#prompt");
-const apiBaseUrl = String(window.AUDORA_RUNTIME_CONFIG?.apiBaseUrl || "").replace(/\\/$/, "");
+const apiBaseUrl = String(window.AUDORA_RUNTIME_CONFIG?.apiBaseUrl || "");
 button?.addEventListener("click", async () => {
   const prompt = promptInput.value.trim() || window.prompt("Describe the image Audora should create:");
   if (!prompt || prompt.trim().length < 4) return;
