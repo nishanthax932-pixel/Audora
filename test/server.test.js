@@ -170,3 +170,23 @@ test("does not trust spoofed forwarded IP headers by default", { concurrency: fa
     });
   } finally { globalThis.fetch = originalFetch; }
 });
+
+
+test("sets baseline browser security headers", async () => {
+  await withServer({}, async (url) => {
+    const response = await fetch(`${url}/api/health`);
+    assert.equal(response.headers.get("x-content-type-options"), "nosniff");
+    assert.equal(response.headers.get("x-frame-options"), "DENY");
+    assert.equal(response.headers.get("referrer-policy"), "strict-origin-when-cross-origin");
+    assert.equal(response.headers.get("cache-control"), "no-store");
+  });
+});
+
+test("allows only explicitly configured browser origins", async () => {
+  await withServer({ AUDORA_ALLOWED_ORIGINS: "https://app.example.test" }, async (url) => {
+    const allowed = await fetch(`${url}/api/config`, { headers: { Origin: "https://app.example.test" } });
+    const denied = await fetch(`${url}/api/config`, { headers: { Origin: "https://evil.example.test" } });
+    assert.equal(allowed.headers.get("access-control-allow-origin"), "https://app.example.test");
+    assert.equal(denied.headers.get("access-control-allow-origin"), null);
+  });
+});
