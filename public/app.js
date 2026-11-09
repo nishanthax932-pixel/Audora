@@ -12,6 +12,9 @@ const profileDialog = document.querySelector("#profile-dialog");
 const profileName = document.querySelector("#profile-name");
 const profileEmail = document.querySelector("#profile-email");
 const PROFILE_KEY = "audora-profile-v1";
+const fileInput = document.querySelector("#file-input");
+const attachmentList = document.querySelector("#attachment-list");
+let attachments = [];
 let profile = { name: "", email: "" };
 
 const STORAGE_KEY = "audora-workspace-v2";
@@ -167,6 +170,48 @@ function renderChat() {
   conversationView.scrollTop = conversationView.scrollHeight;
 }
 
+function renderInline(parent, value) {
+  const pattern = /(`[^`]+`|\\*\\*[^*]+\\*\\*)/g;
+  let cursor = 0;
+  for (const match of value.matchAll(pattern)) {
+    if (match.index > cursor) parent.append(document.createTextNode(value.slice(cursor, match.index)));
+    const token = match[0];
+    const node = document.createElement(token.startsWith("`") ? "code" : "strong");
+    node.textContent = token.startsWith("`") ? token.slice(1, -1) : token.slice(2, -2);
+    parent.append(node);
+    cursor = match.index + token.length;
+  }
+  if (cursor < value.length) parent.append(document.createTextNode(value.slice(cursor)));
+}
+
+function renderRichText(parent, content) {
+  parent.replaceChildren();
+  const lines = content.split("\\n");
+  let list = null;
+  let code = null;
+  for (const line of lines) {
+    if (line.startsWith("```")) {
+      if (code) { parent.append(code); code = null; }
+      else { code = document.createElement("pre"); const block = document.createElement("code"); code.append(block); code._block = block; }
+      list = null;
+      continue;
+    }
+    if (code) { code._block.append(document.createTextNode(`${line}\\n`)); continue; }
+    const item = line.match(/^\\s*[-*]\\s+(.+)$/);
+    if (item) {
+      if (!list) { list = document.createElement("ul"); parent.append(list); }
+      const li = document.createElement("li"); renderInline(li, item[1]); list.append(li); continue;
+    }
+    list = null;
+    if (!line.trim()) continue;
+    const heading = line.match(/^(#{1,3})\\s+(.+)$/);
+    const node = document.createElement(heading ? `h${heading[1].length + 2}` : "p");
+    renderInline(node, heading ? heading[2] : line);
+    parent.append(node);
+  }
+  if (code) parent.append(code);
+}
+
 function renderMessage(role, content, { pending = false, error = false } = {}) {
   const article = document.createElement("article");
   article.className = `message ${role}${error ? " error" : ""}`;
@@ -179,7 +224,8 @@ function renderMessage(role, content, { pending = false, error = false } = {}) {
   label.textContent = role === "assistant" ? config.brandName : "You";
   const text = document.createElement("p");
   text.className = "message-content";
-  text.textContent = content;
+  if (role === "assistant" && !pending && !error) renderRichText(text, content);
+  else text.textContent = content;
   body.append(label, text);
 
   if (role === "assistant" && !pending && !error) {
@@ -222,13 +268,17 @@ async function sendMessage(content) {
   const chat = currentChat();
   if (!chat || isGenerating || !content.trim()) return;
   chat.model = modelSelect.value;
-  chat.messages.push({ role: "user", content: content.trim() });
+  const fileContext = attachments.map((file) => `\\n\\n[Attached file: ${file.name}]\\n${file.content}`).join("");
+  const fullContent = `${content.trim()}${fileContext}`.slice(0, 12000);
+  chat.messages.push({ role: "user", content: fullContent });
+  attachments = [];
+  renderAttachments();
   chat.title = titleFrom(chat.messages);
   chat.updatedAt = Date.now();
   chats = [chat, ...chats.filter((item) => item.id !== chat.id)].slice(0, MAX_LOCAL_CHATS);
   safeSave();
   renderHistory();
-  renderMessage("user", content.trim());
+  renderMessage("user", fullContent);
   const pending = renderMessage("assistant", "Thinking…", { pending: true });
   promptInput.value = "";
   promptInput.style.height = "auto";
@@ -309,6 +359,31 @@ form.addEventListener("submit", (event) => {
   if (!content || isGenerating) return;
   if (!currentChat()) makeChat();
   sendMessage(content);
+});
+
+function renderAttachments() {
+  attachmentList.replaceChildren();
+  for (const file of attachments) {
+    const chip = document.createElement("span");
+    chip.className = "attachment-chip";
+    chip.textContent = `${file.name} · ${Math.ceil(file.content.length / 1024)} KB`;
+    attachmentList.append(chip);
+  }
+}
+
+document.querySelector("#attach-files").addEventListener("click", () => fileInput.click());
+fileInput.addEventListener("change", async () => {
+  const selected = Array.from(fileInput.files || []).slice(0, 4 - attachments.length);
+  for (const file of selected) {
+    if (file.size > 200000) { showNotice(`${file.name} is too large. Text attachments are limited to 200 KB each.`); continue; }
+    try {
+      const content = await file.text();
+      if (attachments.reduce((sum, item) => sum + item.content.length, 0) + content.length > 10000) { showNotice("Combined attachment text is limited to 10,000 characters."); break; }
+      attachments.push({ name: file.name.slice(0, 120), content });
+    } catch { showNotice(`Could not read ${file.name}.`); }
+  }
+  fileInput.value = "";
+  renderAttachments();
 });
 
 document.querySelector("#export-chats").addEventListener("click", () => {
