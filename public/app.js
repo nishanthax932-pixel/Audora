@@ -381,6 +381,32 @@ async function sendMessage(content) {
   }
 }
 
+async function loadEngineStatus() {
+  const badge = document.querySelector("#engine-status");
+  if (!badge) return;
+  try {
+    const response = await fetch(apiUrl("/api/health"), { cache: "no-store" });
+    if (!response.ok) throw new Error(`Status check returned ${response.status}.`);
+    const status = await response.json();
+    const services = [];
+    if (status.searchEnabled) services.push("search");
+    if (status.imageConfigured) services.push("image generation");
+    if (!status.providerConfigured) {
+      badge.textContent = "AI engine setup required";
+      badge.dataset.state = "warning";
+      badge.title = "The workspace is open, but no model API key/provider configuration was found. Configure the server before chatting.";
+    } else {
+      badge.textContent = "AI settings found · live model not verified";
+      badge.dataset.state = "configured";
+      badge.title = `Provider settings are present. This status does not test live inference.${services.length ? ` Optional services configured: ${services.join(", ")}.` : ""}`;
+    }
+  } catch (error) {
+    badge.textContent = "API connection unavailable";
+    badge.dataset.state = "error";
+    badge.title = error.message;
+  }
+}
+
 async function loadConfig() {
   const response = await fetch(apiUrl("/api/config"));
   if (!response.ok) throw new Error(`The Audora API returned ${response.status}.`);
@@ -395,6 +421,7 @@ async function loadConfig() {
   document.querySelector("#welcome-heading").textContent = config.welcomeMessage;
   promptInput.placeholder = `Message ${config.brandName}`;
   modelSelect.replaceChildren(...config.models.map((model) => new Option(model.label, model.id)));
+  loadEngineStatus();
 
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
@@ -493,8 +520,9 @@ stopButton.addEventListener("click", stopGeneration);
 historySearch?.addEventListener("input", renderHistory);
 
 document.querySelectorAll(".suggestions button").forEach((button) => button.addEventListener("click", () => {
-  promptInput.value = button.textContent;
+  promptInput.value = button.dataset.prompt || button.textContent;
   promptInput.focus();
+  promptInput.dispatchEvent(new Event("input", { bubbles: true }));
 }));
 promptInput.addEventListener("input", () => {
   promptInput.style.height = "auto";
