@@ -190,3 +190,38 @@ test("allows only explicitly configured browser origins", async () => {
     assert.equal(denied.headers.get("access-control-allow-origin"), null);
   });
 });
+
+
+test("passes bounded user memory to the hosted model system context", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://provider.invalid/")) {
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Remembered answer" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "compatible", AUDORA_API_URL: "https://provider.invalid/chat", AUDORA_API_KEY: "test-only" }, async (url) => {
+      const response = await originalFetch(`${url}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }], memory: "User is building Audora" }) });
+      assert.equal(response.status, 200);
+      assert.match(requestBody.messages[0].content, /User is building Audora/);
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("explains that image generation needs a server-side provider key", async () => {
+  await withServer({}, async (url) => {
+    const response = await fetch(`${url}/api/image`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: "A blue futuristic city" }) });
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /AUDORA_IMAGE_API_KEY/);
+  });
+});
+
+test("validates image prompts before provider calls", async () => {
+  await withServer({ AUDORA_IMAGE_API_KEY: "test-only" }, async (url) => {
+    const response = await fetch(`${url}/api/image`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: " " }) });
+    assert.equal(response.status, 400);
+  });
+});
