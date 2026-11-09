@@ -109,7 +109,7 @@ export function createApp(environment = process.env) {
   });
   app.use(express.static(path.join(dirname, "public")));
 
-  app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, models: settings.models.map(({ id, label }) => ({ id, label })), imageGenerationEnabled: Boolean(settings.imageApiKey) }));
+  app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, models: settings.models.map(({ id, label }) => ({ id, label })) }));
   app.get("/api/health", (_request, response) => response.json({ name: settings.brandName, status: "ready", provider: settings.provider, providerConfigured: settings.provider !== "compatible" || Boolean(settings.apiKey), models: settings.models.length }));
 
 
