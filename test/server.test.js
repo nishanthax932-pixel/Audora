@@ -211,42 +211,11 @@ test("passes bounded user memory to the hosted model system context", { concurre
   } finally { globalThis.fetch = originalFetch; }
 });
 
-test("explains that image generation needs a server-side provider key", async () => {
+
+test("does not expose an image-generation API", async () => {
   await withServer({}, async (url) => {
     const response = await fetch(`${url}/api/image`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: "A blue futuristic city" }) });
-    assert.equal(response.status, 503);
-    assert.match((await response.json()).error, /AUDORA_IMAGE_API_KEY/);
+    assert.equal(response.status, 404);
+    assert.deepEqual(await response.json(), { error: "Audora API route not found." });
   });
-});
-
-test("validates image prompts before provider calls", async () => {
-  await withServer({ AUDORA_IMAGE_API_KEY: "test-only" }, async (url) => {
-    const response = await fetch(`${url}/api/image`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: " " }) });
-    assert.equal(response.status, 400);
-  });
-});
-
-
-test("proxies generated image bytes using the server-side image key", { concurrency: false }, async () => {
-  const originalFetch = globalThis.fetch;
-  let upstreamUrl;
-  let upstreamHeaders;
-  globalThis.fetch = async (url, options) => {
-    if (String(url).startsWith("https://gen.pollinations.ai/image/")) {
-      upstreamUrl = String(url);
-      upstreamHeaders = options.headers;
-      return new Response(new Uint8Array([255, 216, 255, 217]), { status: 200, headers: { "Content-Type": "image/jpeg" } });
-    }
-    return originalFetch(url, options);
-  };
-  try {
-    await withServer({ AUDORA_IMAGE_API_KEY: "server-only-test-key" }, async (url) => {
-      const response = await originalFetch(`${url}/api/image`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: "A blue city" }) });
-      assert.equal(response.status, 200);
-      assert.equal(response.headers.get("content-type"), "image/jpeg");
-      assert.deepEqual([...new Uint8Array(await response.arrayBuffer())], [255, 216, 255, 217]);
-      assert.match(upstreamUrl, /A%20blue%20city/);
-      assert.equal(upstreamHeaders.Authorization, "Bearer server-only-test-key");
-    });
-  } finally { globalThis.fetch = originalFetch; }
 });
