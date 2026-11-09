@@ -297,13 +297,45 @@ async function sendMessage(content) {
       signal: controller.signal,
       // The API accepts at most 40 context messages. Keep the longer local
       // transcript for history, but send only the newest supported context.
-      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode })
+      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode, stream: true })
     });
-    const result = await response.json().catch(() => ({}));
-    if (!response.ok) throw new Error(result.error || `Audora request failed (${response.status}).`);
-    if (typeof result.message !== "string" || !result.message.trim()) throw new Error("The model returned an empty response.");
-    pending.text.textContent = result.message;
-    const assistantMessage = { role: "assistant", content: result.message };
+    if (!response.ok) {
+      const failure = await response.json().catch(() => ({}));
+      throw new Error(failure.error || `Audora request failed (${response.status}).`);
+    }
+    let answer = "";
+    if (response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = "";
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const events = buffer.split(/\\n\\n/);
+        buffer = events.pop() || "";
+        for (const eventText of events) {
+          const dataLine = eventText.split(/\\r?\\n/).find((line) => line.startsWith("data:"));
+          if (!dataLine) continue;
+          let event;
+          try { event = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
+          if (eventText.includes("event: delta") && typeof event.text === "string") {
+            answer += event.text;
+            pending.text.textContent = answer;
+            conversationView.scrollTop = conversationView.scrollHeight;
+          } else if (eventText.includes("event: error")) {
+            throw new Error(event.error || "The model stream failed.");
+          } else if (eventText.includes("event: done") && typeof event.message === "string") {
+            answer = event.message;
+          }
+        }
+      }
+    } else {
+      const result = await response.json().catch(() => ({}));
+      if (typeof result.message === "string") answer = result.message;
+    }
+    if (!answer.trim()) throw new Error("The model returned an empty response.");
+    const assistantMessage = { role: "assistant", content: answer };
     chat.messages.push(assistantMessage);
     chat.updatedAt = Date.now();
     chats = [chat, ...chats.filter((item) => item.id !== chat.id)].slice(0, MAX_LOCAL_CHATS);
@@ -311,7 +343,7 @@ async function sendMessage(content) {
     renderHistory();
     // Replace the pending row so the copy action is available.
     pending.article.remove();
-    renderMessage("assistant", result.message);
+    renderMessage("assistant", answer);
   } catch (error) {
     const message = error.name === "AbortError" ? "Generation stopped." : error.message;
     pending.text.textContent = message;
