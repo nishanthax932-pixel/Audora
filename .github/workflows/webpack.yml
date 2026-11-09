@@ -1,28 +1,57 @@
-name: NodeJS with Webpack
+name: Node.js CI
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: audora-ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  build:
+  verify:
     runs-on: ubuntu-latest
-
     strategy:
+      fail-fast: false
       matrix:
-        node-version: [18.x, 20.x, 22.x]
-
+        node-version: [20.x, 22.x]
     steps:
-    - uses: actions/checkout@v4
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+      - name: Install dependencies
+        run: npm ci
+      - name: Review dependency advisories
+        run: |
+          npm audit --json > "$RUNNER_TEMP/audora-audit.json" || true
+          node --input-type=commonjs -e 'const a = require(process.env.RUNNER_TEMP + "/audora-audit.json"); for (const [name, item] of Object.entries(a.vulnerabilities || {})) console.log(JSON.stringify({name, severity:item.severity, direct:item.isDirect, range:item.range, via:item.via, fixAvailable:item.fixAvailable}));'
+      - name: Enforce dependency audit
+        run: npm audit --audit-level=moderate
+      - name: Check syntax
+        run: npm run build
+      - name: Run tests
+        run: npm test
+      - name: Build production container
+        run: docker build --tag audora-ci .
 
-    - name: Use Node.js ${{ matrix.node-version }}
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ matrix.node-version }}
-
-    - name: Build
-      run: |
-        npm install
-        npx webpack
+  validate-training-starter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate training script syntax and example dataset
+        run: |
+          python -m py_compile training/train_lora.py training/train.py
+          python -c "import json; rows=[json.loads(x) for x in open('training/data/train.example.jsonl', encoding='utf-8') if x.strip()]; assert len(rows) >= 2 and all(isinstance(r.get('prompt'), str) and isinstance(r.get('response'), str) for r in rows)"

@@ -1,111 +1,115 @@
 # Audora
 
-**Audora** is an online, white-label AI workspace with a ChatGPT-inspired chat
-experience and provider-agnostic inference layer. It is a practical foundation
-for a custom model product—not a claim of artificial general intelligence.
+**Audora** is a self-hostable AI workspace intended to run open-weight models
+on infrastructure controlled by Audora. It does not silently send prompts to
+a third-party text-generation service. Optional image generation uses an
+Audora-controlled local Diffusers checkpoint and never calls a hosted image API.
 
-## Run locally
+## Run the workspace
 
 ```bash
 npm install
+cp .env.example .env
 npm start
 ```
 
-Open `http://localhost:3000` and chat. With no configuration at all, Audora
-answers through a free shared model tier so the app works out of the box at
-zero cost. That tier is rate-limited, can be busy at peak times, and messages
-leave your machine to an outside free service - do not discuss secrets on it,
-and expect occasional "free tier is busy" replies.
+The Node.js app expects a local OpenAI-compatible inference endpoint. The
+default is `http://127.0.0.1:8000/v1/chat/completions`. If no model server is
+running, chat reports a configuration error rather than falling back to an
+outside provider.
 
-## Test
+## Run an unquantized open-weight model
+
+Install CUDA-compatible PyTorch and vLLM, download an open-weight checkpoint
+whose license permits your intended use, then launch it. Example:
 
 ```bash
-npm install
+vllm serve ./models/audora-checkpoint \
+  --served-model-name audora-local \
+  --dtype bfloat16 \
+  --api-key replace-with-a-long-random-secret
+```
+
+Use BF16/FP16 safetensors if you specifically want non-quantized weights.
+Avoid GGUF, AWQ, GPTQ, and 4-bit/8-bit quantized variants. BF16/FP16 are
+floating-point formats (not quantized weights), although they are not FP32.
+Set the same strong random API key (at least 32 characters) and model name in `.env`. Keep inference private
+and authenticated; do not expose an unauthenticated model endpoint publicly.
+
+## Fine-tune Audora
+
+Two starter paths are included:
+
+- `training/train.py`: full fine-tuning with the original model loaded in
+  BF16/FP16; no quantized loading and no LoRA adapters.
+- `training/train_lora.py`: lower-memory LoRA/PEFT option that trains
+  adapter weights while leaving the base model frozen.
+
+Both training scripts mask user/system prompt tokens from the loss and train on assistant response tokens only. Full fine-tuning requires substantially more GPU memory because weights,
+gradients, optimizer states, and activations all consume memory. LoRA is more
+practical on smaller GPUs, but it does not change the base weights. Neither
+method is training a foundation model from scratch.
+
+For full fine-tuning, copy the example data, add your reviewed examples, and run:
+
+```bash
+cp training/data/train.example.jsonl training/data/train.jsonl
+pip install -r training/requirements.txt
+python training/train.py --model Qwen/Qwen2.5-0.5B-Instruct --data training/data/train.jsonl --output models/audora-checkpoint
+```
+
+For LoRA, follow the instructions in `training/train_lora.py`. Install a
+CUDA-compatible PyTorch build first. GitHub stores source code and
+configuration; it does not provide the GPU compute or storage needed to train
+a model. Check model and dataset licenses, use only data you have permission
+to train on, remove personal information, deduplicate examples, and keep a
+held-out evaluation set. Fine-tuning does not automatically make every answer
+more accurate.
+
+After training, serve the resulting full checkpoint or merged adapter with
+vLLM and configure `AUDORA_API_URL`, `AUDORA_API_KEY`, and `AUDORA_MODEL`
+in the server environment. Never commit real credentials or model secrets.
+
+## Reasoning and answer quality
+
+Audora is instructed to provide useful explanations, assumptions, key steps,
+checks, and verifiable conclusions. It does not expose private internal
+chain-of-thought. Test the final answers for correctness, factuality, and
+consistency instead of exposing hidden scratchpad reasoning.
+
+## Existing workspace capabilities
+
+Chat history and profile memory are stored in browser local storage. There is
+no account login, cross-device sync, or cloud chat database in this starter.
+Text/code attachments and safe Markdown rendering are supported. Web search and source-link citations are available when SearXNG is configured; live token streaming is supported by compatible and Ollama providers. Autonomous multi-step tool execution is not yet implemented.
+Image generation has a self-hosted UI/API path; it remains disabled until a local Diffusers checkpoint, CUDA GPU, and matching server secret are configured. See `image/README.md`.
+
+## Web search with source citations
+
+Audora can retrieve live search results through a SearXNG instance that you control. Install and run SearXNG, enable JSON output in its search settings, then set the server-only environment variable:
+
+```bash
+AUDORA_SEARCH_URL=http://127.0.0.1:8080/search
+```
+
+Restart Audora. The search button appears in the composer when the endpoint is configured. Search snippets are passed to the model as untrusted evidence; the model is instructed to cite source URLs and not follow instructions embedded in web pages. Search is optional and does not silently fall back to a third-party search provider. SearXNG's JSON API requires `format=json` to be enabled by the instance administrator.
+
+## Self-hosted image generation
+
+See `image/README.md` to install the local Diffusers service and provide an already-downloaded, properly licensed SDXL checkpoint. The Node API proxies only to the configured private image service. The model server loads from disk with `local_files_only=True`; it does not download weights or call Pollinations/other hosted image providers. A CUDA GPU and substantial VRAM are required. Do not expose the image service publicly.
+
+## Tests and production
+
+```bash
 npm test
+npm run build
 ```
 
-Runs the server test suite (validation, rate limiting, provider behavior,
-error handling). No API key is needed - provider calls are simulated in tests.
+Tests mock the local inference server; they verify request construction and
+error handling, not model quality or GPU availability. A real end-to-end check
+requires the actual checkpoint and inference server.
 
-For your own provider, copy `.env.example` to `.env` and either point Audora at
-an OpenAI-compatible hosted provider (`AUDORA_PROVIDER=compatible`,
-`AUDORA_API_URL`, `AUDORA_API_KEY`) or run a local model with Ollama
-(`AUDORA_PROVIDER=ollama`, no cloud key needed). Keep API keys only in
-environment variables - never in browser code.
-
-## Deploy without 404 errors
-
-The browser UI and `/api/*` server must be deployed together, or the UI needs
-the URL of a separately deployed Audora API. A static-only host cannot run the
-chat server or Ollama and will return `404` for `/api/config` and `/api/chat`.
-
-### Deploy the full application together
-
-Deploy this repository to any host that runs Node applications, set its start
-command to `npm start`, and expose port `3000`. A container deployment can use:
-
-```bash
-docker build -t audora .
-docker run --env-file .env -p 3000:3000 audora
-```
-
-### Deploy the UI and API separately
-
-Deploy this Node application as the API, then edit `public/runtime-config.js`
-before deploying the `public` directory to a static host:
-
-```js
-window.AUDORA_RUNTIME_CONFIG = { apiBaseUrl: "https://your-audora-api.example" };
-```
-
-Set `AUDORA_ALLOWED_ORIGINS=https://your-static-site.example` on the API. The
-server permits only listed cross-origin browser requests; do not use `*`.
-
-## Configuration
-
-### Use Audora with no cloud API key
-
-Audora supports local Ollama inference. Install [Ollama](https://ollama.com),
-then run the following once before starting Audora:
-
-```bash
-ollama pull qwen3:8b
-ollama serve
-npm start
-```
-
-The supplied `.env.example` uses `AUDORA_PROVIDER=ollama`, so no cloud API key
-is needed. Your prompts stay on the machine running Ollama. This is still a
-real language model, but its quality and hardware requirements depend on the
-model you choose—it is not an AGI.
-
-### Use a hosted provider
-
-Set `AUDORA_PROVIDER=compatible`, configure `AUDORA_API_URL` with a
-compatible chat-completions endpoint, set `AUDORA_API_KEY`, and choose a
-model through `AUDORA_MODEL`. Keep API keys only in environment variables—never
-in browser code.
-
-### White-labeling
-
-Set `AUDORA_BRAND_NAME`, `AUDORA_BRAND_TAGLINE`, `AUDORA_ACCENT_COLOR`, and
-`AUDORA_WELCOME_MESSAGE` to make the workspace your own. These safe branding
-values are delivered by `/api/config`; credentials remain server-only. Use
-`AUDORA_MODELS` to control models users can select. It is a JSON array, where
-each model has a user-facing `label` and a provider-facing `id`.
-
-## Production checklist
-
-Before a public launch, configure a real identity provider and a shared,
-durable rate limiter/database. The included rate limiter is per-process and
-only protects a single server instance. Set request/spend limits with your
-inference provider, use HTTPS, and add monitoring. This application is an AI
-workspace; it does not itself train or constitute an AGI model.
-
-## Building a real custom model
-
-The responsible path to a distinct Audora model is to evaluate a suitable
-open-weight base model, curate consented task data, fine-tune and evaluate it,
-then deploy the resulting checkpoint behind this service. Training a
-frontier-scale foundation model from scratch requires large-scale data,
-specialized GPU infrastructure, and rigorous safety evaluation.
+Before public launch, configure identity, durable rate limiting, monitoring,
+HTTPS, access controls, backups, and infrastructure capacity. The built-in
+rate limiter is per-process. Chat history is local to the current browser;
+the inference server receives the context submitted for each request.

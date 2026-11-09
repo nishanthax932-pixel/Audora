@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node -r dotenv/config server.js",
     "dev": "node -r dotenv/config --watch server.js",
-    "build": "node --check server.js && node --check public/app.js",
+    "build": "node --check server.js && node --check public/app.js && node --check public/image.js",
     "test": "node --test"
   },
   "engines": {
@@ -16,5 +16,10 @@
   "dependencies": {
     "dotenv": "^16.6.1",
     "express": "^5.1.0"
+  },
+  "overrides": {
+    "body-parser": "2.4.0",
+    "proxy-addr": "2.0.8",
+    "qs": "6.16.1"
   }
 }
