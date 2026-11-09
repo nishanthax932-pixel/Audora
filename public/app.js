@@ -49,6 +49,7 @@ function showNotice(message) {
 function makeChat() {
   const chat = { id: createId(), title: "New chat", createdAt: Date.now(), updatedAt: Date.now(), model: modelSelect.value || config.models[0]?.id, messages: [] };
   chats.unshift(chat);
+  chats = chats.slice(0, MAX_LOCAL_CHATS);
   activeChatId = chat.id;
   safeSave();
   renderHistory();
@@ -196,6 +197,7 @@ async function sendMessage(content) {
   chat.messages.push({ role: "user", content: content.trim() });
   chat.title = titleFrom(chat.messages);
   chat.updatedAt = Date.now();
+  chats = [chat, ...chats.filter((item) => item.id !== chat.id)].slice(0, MAX_LOCAL_CHATS);
   safeSave();
   renderHistory();
   renderMessage("user", content.trim());
@@ -221,7 +223,9 @@ async function sendMessage(content) {
     const assistantMessage = { role: "assistant", content: result.message };
     chat.messages.push(assistantMessage);
     chat.updatedAt = Date.now();
+    chats = [chat, ...chats.filter((item) => item.id !== chat.id)].slice(0, MAX_LOCAL_CHATS);
     safeSave();
+    renderHistory();
     // Replace the pending row so the copy action is available.
     pending.article.remove();
     renderMessage("assistant", result.message);
@@ -279,6 +283,19 @@ form.addEventListener("submit", (event) => {
   sendMessage(content);
 });
 
+document.querySelector("#export-chats").addEventListener("click", () => {
+  if (!chats.length) {
+    showNotice("There are no conversations to export yet.");
+    return;
+  }
+  const payload = JSON.stringify({ exportedAt: new Date().toISOString(), format: "audora-local-chats-v1", conversations: chats }, null, 2);
+  const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `audora-chats-${new Date().toISOString().slice(0, 10)}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+});
 document.querySelector("#new-chat").addEventListener("click", () => {
   if (isGenerating) return;
   makeChat();
