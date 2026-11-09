@@ -99,8 +99,11 @@ each model has a user-facing `label` and a provider-facing `id`.
 
 Before a public launch, configure a real identity provider and a shared,
 durable rate limiter/database. The included rate limiter is per-process and
-only protects a single server instance. Set request/spend limits with your
-inference provider, use HTTPS, and add monitoring. This application is an AI
+only protects a single server instance. By default, forwarded IP headers are
+not trusted; set `AUDORA_TRUST_PROXY=1` only when exactly one trusted reverse
+proxy sits in front of Node. The free provider also has a shared upstream
+cooldown, so one visitor may temporarily delay other free-tier visitors.
+Set request/spend limits with your inference provider, use HTTPS, and add monitoring. This application is an AI
 workspace; it does not itself train or constitute an AGI model.
 
 ## Building a real custom model
