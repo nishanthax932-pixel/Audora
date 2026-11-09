@@ -294,3 +294,30 @@ test("uses configured SearXNG search and filters unsafe result URLs", { concurre
     globalThis.fetch = originalFetch;
   }
 });
+
+
+test("reports setup state and optional workspace services without claiming live inference", async () => {
+  await withServer({}, async (url) => {
+    const health = await (await fetch(`${url}/api/health`)).json();
+    assert.equal(health.status, "setup-required");
+    assert.equal(health.providerConfigured, false);
+    assert.equal(health.imageConfigured, false);
+    assert.equal(health.searchEnabled, false);
+    assert.equal(health.historyStorage, "browser-local");
+    assert.equal(health.accountsEnabled, false);
+    assert.equal(health.liveInferenceVerified, false);
+  });
+  await withServer({
+    AUDORA_PROVIDER: "ollama",
+    AUDORA_OLLAMA_URL: "http://127.0.0.1:11434/api/chat",
+    AUDORA_IMAGE_API_KEY: "image-test-only",
+    AUDORA_SEARCH_URL: "http://127.0.0.1:8080/search"
+  }, async (url) => {
+    const health = await (await fetch(`${url}/api/health`)).json();
+    assert.equal(health.status, "configured");
+    assert.equal(health.providerConfigured, true);
+    assert.equal(health.imageConfigured, true);
+    assert.equal(health.searchEnabled, true);
+    assert.equal(health.liveInferenceVerified, false);
+  });
+});

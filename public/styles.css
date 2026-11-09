@@ -82,3 +82,17 @@
 #search-mode[aria-pressed="true"]{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
 .message-content a{color:#78b8ff;text-decoration:underline;text-underline-offset:2px;overflow-wrap:anywhere}
 .light .message-content a{color:#1459a6}
+
+
+/* First-run status and guided task starters */
+.engine-status{max-width:42vw;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:11px;color:#b9b9b9;border:1px solid #444;border-radius:999px;padding:6px 10px}
+.engine-status[data-state="warning"]{color:#f0cc8d;border-color:#765b2d;background:#382c19}
+.engine-status[data-state="configured"]{color:#a8d9c1;border-color:#315d49;background:#1c3028}
+.engine-status[data-state="error"]{color:#ffb2a8;border-color:#75413c;background:#351f1d}
+.suggestions{max-width:680px;margin-left:auto;margin-right:auto}
+.suggestions button{font-size:12px;line-height:1.35;min-height:38px}
+.light .engine-status{color:#555;border-color:#ddd}
+.light .engine-status[data-state="warning"]{color:#704b13;background:#fff5df;border-color:#e5c98e}
+.light .engine-status[data-state="configured"]{color:#205d40;background:#eaf7ef;border-color:#b8ddc7}
+.light .engine-status[data-state="error"]{color:#8c2f28;background:#fff0ee;border-color:#e8b9b4}
+@media(max-width:700px){.engine-status{max-width:46vw;font-size:9px;padding:5px 7px}.suggestions{gap:7px}.suggestions button{padding:8px 10px}}

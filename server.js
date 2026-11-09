@@ -174,7 +174,21 @@ export function createApp(environment = process.env) {
   app.use(express.static(path.join(dirname, "public")));
 
   app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, searchEnabled: Boolean(settings.searchUrl), models: settings.models.map(({ id, label }) => ({ id, label })) }));
-  app.get("/api/health", (_request, response) => response.json({ name: settings.brandName, status: "ready", provider: settings.provider, providerConfigured: settings.provider !== "compatible" || Boolean(settings.apiKey), models: settings.models.length }));
+  app.get("/api/health", (_request, response) => {
+    const providerConfigured = Boolean(settings.apiUrl) && (settings.provider === "ollama" || Boolean(settings.apiKey));
+    response.json({
+      name: settings.brandName,
+      status: providerConfigured ? "configured" : "setup-required",
+      provider: settings.provider,
+      providerConfigured,
+      imageConfigured: Boolean(settings.imageApiKey),
+      searchEnabled: Boolean(settings.searchUrl),
+      models: settings.models.length,
+      historyStorage: "browser-local",
+      accountsEnabled: false,
+      liveInferenceVerified: false
+    });
+  });
 
 
 
