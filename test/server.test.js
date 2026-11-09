@@ -155,6 +155,30 @@ test("allows only explicitly configured browser origins", async () => {
 });
 
 
+test("enables detailed visible explanations when Brain mode is selected", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://provider.invalid/")) {
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Detailed answer" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "compatible", AUDORA_API_URL: "https://provider.invalid/chat", AUDORA_API_KEY: "test-only" }, async (url) => {
+      const response = await originalFetch(`${url}/api/chat`, {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "Solve this carefully" }], reasoning: true })
+      });
+      assert.equal(response.status, 200);
+      assert.match(requestBody.messages[0].content, /detailed explanation mode/i);
+      assert.match(requestBody.messages[0].content, /intermediate calculations/i);
+      assert.match(requestBody.messages[0].content, /Do not reveal private internal chain-of-thought/i);
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("passes bounded user memory to the hosted model system context", { concurrency: false }, async () => {
   const originalFetch = globalThis.fetch;
   let requestBody;
