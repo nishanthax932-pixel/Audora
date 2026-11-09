@@ -15,8 +15,6 @@ const profileMemory = document.querySelector("#profile-memory");
 const PROFILE_KEY = "audora-profile-v1";
 const fileInput = document.querySelector("#file-input");
 const attachmentList = document.querySelector("#attachment-list");
-const imageModeButton = document.querySelector("#image-mode");
-let imageMode = false;
 let attachments = [];
 let profile = { name: "", email: "" };
 
@@ -283,35 +281,13 @@ async function sendMessage(content) {
   safeSave();
   renderHistory();
   renderMessage("user", fullContent);
-  const pending = renderMessage("assistant", imageMode ? "Creating your image…" : "Thinking…", { pending: true });
+  const pending = renderMessage("assistant", "Thinking…", { pending: true });
   promptInput.value = "";
   promptInput.style.height = "auto";
   controller = new AbortController();
   setGenerating(true);
 
   try {
-    if (imageMode) {
-      const response = await fetch(apiUrl("/api/image"), { method: "POST", headers: { "Content-Type": "application/json" }, signal: controller.signal, body: JSON.stringify({ prompt: content.trim() }) });
-      if (!response.ok) { const failure = await response.json().catch(() => ({})); throw new Error(failure.error || `Image generation failed (${response.status}).`); }
-      const imageUrl = URL.createObjectURL(await response.blob());
-      pending.text.textContent = "";
-      const image = document.createElement("img");
-      image.src = imageUrl;
-      image.alt = `Generated image: ${content.trim()}`;
-      image.loading = "lazy";
-      image.className = "generated-image";
-      pending.text.append(image);
-      const download = document.createElement("a");
-      download.href = imageUrl;
-      download.download = `audora-image-${Date.now()}.jpg`;
-      download.textContent = "Download image";
-      download.className = "image-download";
-      pending.text.append(download);
-      chat.messages.push({ role: "assistant", content: `[Image generated for prompt: ${content.trim()}]` });
-      chat.updatedAt = Date.now();
-      safeSave();
-      return;
-    }
     const response = await fetch(apiUrl("/api/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -398,12 +374,6 @@ function renderAttachments() {
 }
 
 document.querySelector("#attach-files").addEventListener("click", () => fileInput.click());
-imageModeButton.addEventListener("click", () => {
-  imageMode = !imageMode;
-  imageModeButton.setAttribute("aria-pressed", String(imageMode));
-  imageModeButton.classList.toggle("active", imageMode);
-  promptInput.placeholder = imageMode ? "Describe the image you want to create…" : `Message ${config.brandName}`;
-});
 fileInput.addEventListener("change", async () => {
   const selected = Array.from(fileInput.files || []).slice(0, 4 - attachments.length);
   for (const file of selected) {
