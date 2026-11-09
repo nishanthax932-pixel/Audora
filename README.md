@@ -74,8 +74,9 @@ ollama serve
 npm start
 ```
 
-The supplied `.env.example` uses `AUDORA_PROVIDER=ollama`, so no cloud API key
-is needed. Your prompts stay on the machine running Ollama. This is still a
+Set `AUDORA_PROVIDER=ollama` in `.env` to use Ollama; the example file documents
+the optional setting. No cloud API key is needed in this mode. Your prompts
+stay on the machine running Ollama. This is still a
 real language model, but its quality and hardware requirements depend on the
 model you choose—it is not an AGI.
 
