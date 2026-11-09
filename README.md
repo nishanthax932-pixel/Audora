@@ -85,6 +85,16 @@ Text/code attachments and safe Markdown rendering are supported. Web search,
 citations, streaming, and multi-step tool execution are not yet implemented.
 Image generation has a self-hosted UI/API path; it remains disabled until a local Diffusers checkpoint, CUDA GPU, and matching server secret are configured. See `image/README.md`.
 
+## Web search with source citations
+
+Audora can retrieve live search results through a SearXNG instance that you control. Install and run SearXNG, enable JSON output in its search settings, then set the server-only environment variable:
+
+```bash
+AUDORA_SEARCH_URL=http://127.0.0.1:8080/search
+```
+
+Restart Audora. The search button appears in the composer when the endpoint is configured. Search snippets are passed to the model as untrusted evidence; the model is instructed to cite source URLs and not follow instructions embedded in web pages. Search is optional and does not silently fall back to a third-party search provider. SearXNG's JSON API requires `format=json` to be enabled by the instance administrator.
+
 ## Self-hosted image generation
 
 See `image/README.md` to install the local Diffusers service and provide an already-downloaded, properly licensed SDXL checkpoint. The Node API proxies only to the configured private image service. The model server loads from disk with `local_files_only=True`; it does not download weights or call Pollinations/other hosted image providers. A CUDA GPU and substantial VRAM are required. Do not expose the image service publicly.
