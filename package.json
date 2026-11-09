@@ -8,7 +8,8 @@
     "start": "node -r dotenv/config server.js",
     "dev": "node -r dotenv/config --watch server.js",
     "build": "node --check server.js && node --check public/app.js && node --check public/image.js",
-    "test": "node --test"
+    "test": "node --test",
+    "doctor": "node scripts/doctor.mjs"
   },
   "engines": {
     "node": ">=18"
