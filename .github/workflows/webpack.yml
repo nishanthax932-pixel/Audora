@@ -41,3 +41,17 @@ jobs:
         run: npm test
       - name: Build production container
         run: docker build --tag audora-ci .
+
+  validate-training-starter:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+      - name: Validate training script syntax and example dataset
+        run: |
+          python -m py_compile training/train_lora.py
+          python -c "import json; rows=[json.loads(x) for x in open('training/data/train.example.jsonl', encoding='utf-8') if x.strip()]; assert len(rows) >= 2 and all(isinstance(r.get('prompt'), str) and isinstance(r.get('response'), str) for r in rows)"
