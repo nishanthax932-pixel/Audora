@@ -51,15 +51,31 @@ function getSettings(environment = process.env) {
 
 function createRateLimiter(settings) {
   const visitors = new Map();
+  let requestsSinceCleanup = 0;
   return (request, response, next) => {
     const key = request.ip || request.socket.remoteAddress || "unknown";
     const now = Date.now();
+
+    // Keep this in-memory fallback bounded. Multi-instance deployments should
+    // replace it with a shared store (for example Redis).
+    if (++requestsSinceCleanup >= 256) {
+      requestsSinceCleanup = 0;
+      for (const [visitor, entry] of visitors) {
+        if (now - entry.startedAt > settings.rateLimitWindowMs * 2) visitors.delete(visitor);
+      }
+    }
+    if (!visitors.has(key) && visitors.size >= 10000) {
+      const oldestVisitor = visitors.keys().next().value;
+      if (oldestVisitor !== undefined) visitors.delete(oldestVisitor);
+    }
+
     const record = visitors.get(key) || { count: 0, startedAt: now };
     if (now - record.startedAt >= settings.rateLimitWindowMs) Object.assign(record, { count: 0, startedAt: now });
     record.count += 1;
     visitors.set(key, record);
     response.setHeader("RateLimit-Limit", settings.rateLimitMax);
     response.setHeader("RateLimit-Remaining", Math.max(0, settings.rateLimitMax - record.count));
+    response.setHeader("RateLimit-Reset", Math.ceil((record.startedAt + settings.rateLimitWindowMs) / 1000));
     if (record.count > settings.rateLimitMax) return response.status(429).json({ error: "Too many requests. Please try again shortly." });
     next();
   };
@@ -127,13 +143,23 @@ export function createApp(environment = process.env) {
           const busy = providerResponse.status === 429 || providerResponse.status === 503;
           return response.status(busy ? 429 : 502).json({ error: busy ? "The free model tier is busy right now. Please try again in a moment." : "The free model service could not complete this request. Please try again in a moment." });
         }
-        return response.status(status).json({ error: payload.error?.message || "The inference provider could not complete this request." });
+        // Provider error bodies can contain internal URLs, account details, or
+        // other implementation data. Keep those details in server logs only.
+        console.error("Audora provider request failed", { status, provider: settings.provider });
+        return response.status(status).json({ error: "The inference provider could not complete this request. Please try again or check the server configuration." });
       }
       return response.json({ message: settings.provider === "ollama" ? (payload.message?.content || "The local model returned an empty response.") : (payload.choices?.[0]?.message?.content || "The model returned an empty response."), model: model.label });
     } catch (error) {
       const unreachable = settings.provider === "ollama" ? "Audora could not reach Ollama. Start Ollama and pull the model named in .env." : settings.provider === "free" ? "Audora could not reach the free model service. Please try again in a moment." : "Audora could not reach its inference provider.";
       return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "The model took too long to respond. Please try again." : unreachable });
     } finally { clearTimeout(timer); }
+  });
+  app.use((error, _request, response, _next) => {
+    if (response.headersSent) return;
+    const status = error?.type === "entity.too.large" ? 413 : error?.type === "entity.parse.failed" ? 400 : 500;
+    const message = status === 413 ? "Request body is too large." : status === 400 ? "Request body must contain valid JSON." : "An unexpected server error occurred.";
+    if (status === 500) console.error("Audora request failed", error);
+    response.status(status).json({ error: message });
   });
   app.use("/api", (_request, response) => response.status(404).json({ error: "Audora API route not found." }));
   app.get("/{*path}", (_request, response) => response.sendFile(path.join(dirname, "public", "index.html")));
