@@ -11,11 +11,8 @@ npm install
 npm start
 ```
 
-Open `http://localhost:3000` and chat. With no configuration at all, Audora
-answers through a free shared model tier so the app works out of the box at
-zero cost. That tier is rate-limited, can be busy at peak times, and messages
-leave your machine to an outside free service - do not discuss secrets on it,
-and expect occasional "free tier is busy" replies.
+Open `http://localhost:3000` and chat. Audora does not silently route prompts to an outside free model. Configure a
+local model server before chatting; the default endpoint is local vLLM.
 
 ## Test
 
@@ -28,10 +25,9 @@ Runs the server test suite (validation, rate limiting, provider behavior,
 error handling). No API key is needed - provider calls are simulated in tests.
 
 For your own provider, copy `.env.example` to `.env` and either point Audora at
-an OpenAI-compatible hosted provider (`AUDORA_PROVIDER=compatible`,
-`AUDORA_API_URL`, `AUDORA_API_KEY`) or run a local model with Ollama
-(`AUDORA_PROVIDER=ollama`, no cloud key needed). Keep API keys only in
-environment variables - never in browser code.
+a local OpenAI-compatible inference server such as vLLM (`AUDORA_PROVIDER=compatible`,
+`AUDORA_API_URL`, `AUDORA_API_KEY`) or optionally run Ollama. Keep credentials
+in environment variables and never in browser code.
 
 ## Chat history and privacy
 
@@ -163,3 +159,34 @@ The chat model currently returns normal text completions. Web search and
 multi-step function/tool calling are not yet wired into the request lifecycle.
 For reasoning questions, ask for a concise explanation or visible solution
 steps; the app does not expose private internal chain-of-thought.
+
+
+## Open-weight Audora model and fine-tuning
+
+The default provider is a local OpenAI-compatible inference server. For
+unquantized model weights, use a BF16/FP16 safetensors checkpoint with vLLM;
+do not select GGUF, AWQ, GPTQ, or 4-bit/8-bit quantized downloads. Example:
+
+```bash
+vllm serve ./models/audora-checkpoint --served-model-name audora-local --dtype bfloat16 --api-key local-audora-key
+```
+
+A full fine-tuning starter is in `training/train.py`. It loads original
+weights directly in BF16/FP16 (no quantized loading or LoRA) and trains on
+permissioned JSONL conversations:
+
+```bash
+pip install -r training/requirements.txt
+python training/train.py --model Qwen/Qwen2.5-0.5B-Instruct --data data/audora_train.jsonl --output models/audora-checkpoint
+```
+
+Install a CUDA-compatible PyTorch build first. Full fine-tuning needs a
+substantial GPU and memory for weights, gradients, optimizer states, and
+activations; GitHub stores code but does not provide the training GPU or model
+storage. Start with a small model, verify its license, use data you have
+permission to train on, and maintain a held-out evaluation set. Fine-tuning
+is not equivalent to training a frontier model from scratch.
+
+Audora provides user-facing explanations, assumptions, key steps, and
+verifiable conclusions; it does not expose private internal chain-of-thought.
+Image generation remains removed until an Audora-owned image model exists.
