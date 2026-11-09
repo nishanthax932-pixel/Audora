@@ -103,6 +103,10 @@ See `image/README.md` to install the local Diffusers service and provide an alre
 
 See [the everyday user guide](docs/USER-GUIDE.md) for first-time setup status, everyday workspace tools, privacy, and troubleshooting.
 
+## Free hosted deployment
+
+See [free hosting](docs/FREE-HOSTING.md) for a Render Free blueprint that hosts the Audora interface and API gateway with a public HTTPS URL. The model runtime, web search service, and image-generation engine remain separate services and must be configured independently.
+
 ## Deployment and configuration doctor
 
 See [the deployment guide](docs/DEPLOYMENT.md) for the Docker Compose GPU stack, model setup, optional services, and production security notes. Copy `.env.compose.example` to `.env` when using Compose. Run `npm run doctor` to check local configuration and reveal remaining infrastructure gaps; this check does not claim that a model or GPU is online.
