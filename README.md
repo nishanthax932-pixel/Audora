@@ -81,8 +81,7 @@ consistency instead of exposing hidden scratchpad reasoning.
 
 Chat history and profile memory are stored in browser local storage. There is
 no account login, cross-device sync, or cloud chat database in this starter.
-Text/code attachments and safe Markdown rendering are supported. Web search,
-citations, streaming, and multi-step tool execution are not yet implemented.
+Text/code attachments and safe Markdown rendering are supported. Web search and source-link citations are available when SearXNG is configured; live token streaming is supported by compatible and Ollama providers. Autonomous multi-step tool execution is not yet implemented.
 Image generation has a self-hosted UI/API path; it remains disabled until a local Diffusers checkpoint, CUDA GPU, and matching server secret are configured. See `image/README.md`.
 
 ## Web search with source citations
