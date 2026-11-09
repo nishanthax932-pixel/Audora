@@ -199,10 +199,31 @@ test("passes bounded user memory to the hosted model system context", { concurre
 });
 
 
-test("does not expose an image-generation API", async () => {
+test("keeps image generation disabled until the self-hosted model is configured", async () => {
   await withServer({}, async (url) => {
     const response = await fetch(`${url}/api/image`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: "A blue futuristic city" }) });
-    assert.equal(response.status, 404);
-    assert.deepEqual(await response.json(), { error: "Audora API route not found." });
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /self-hosted image model is not configured/i);
   });
+});
+
+test("proxies image generation only to the configured self-hosted engine", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let upstreamOptions;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === "http://image.local/generate") {
+      upstreamOptions = options;
+      return new Response(JSON.stringify({ image: "aGVsbG8=" }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_IMAGE_API_URL: "http://image.local/generate", AUDORA_IMAGE_API_KEY: "local-test-key" }, async (url) => {
+      const response = await originalFetch(`${url}/api/image`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ prompt: "A blue futuristic city" }) });
+      assert.equal(response.status, 200);
+      assert.equal((await response.json()).image, "data:image/png;base64,aGVsbG8=");
+      assert.equal(upstreamOptions.headers.Authorization, "Bearer local-test-key");
+      assert.equal(JSON.parse(upstreamOptions.body).prompt, "A blue futuristic city");
+    });
+  } finally { globalThis.fetch = originalFetch; }
 });
