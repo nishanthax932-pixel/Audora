@@ -7,6 +7,12 @@ const historyView = document.querySelector("#history");
 const historySearch = document.querySelector("#history-search");
 const sendButton = document.querySelector("#send-button");
 const stopButton = document.querySelector("#stop-button");
+const profileButton = document.querySelector("#profile-button");
+const profileDialog = document.querySelector("#profile-dialog");
+const profileName = document.querySelector("#profile-name");
+const profileEmail = document.querySelector("#profile-email");
+const PROFILE_KEY = "audora-profile-v1";
+let profile = { name: "", email: "" };
 
 const STORAGE_KEY = "audora-workspace-v2";
 const THEME_KEY = "audora-theme-v1";
@@ -36,6 +42,28 @@ function safeSave() {
   } catch {
     showNotice("Local storage is full. Export or delete older chats to save more.");
   }
+}
+
+function saveProfile() {
+  profile = { name: profileName.value.trim().slice(0, 60), email: profileEmail.value.trim().slice(0, 120) };
+  try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); }
+  catch { showNotice("Profile could not be saved in this browser."); }
+  renderProfile();
+  profileDialog.close();
+}
+
+function renderProfile() {
+  const initial = (profile.name || profile.email || "N").trim().slice(0, 1).toUpperCase();
+  profileButton.textContent = initial;
+  profileButton.title = profile.name || profile.email || "Audora profile";
+  document.querySelector("#profile-avatar").textContent = initial;
+}
+
+function openProfile() {
+  profileName.value = profile.name;
+  profileEmail.value = profile.email;
+  renderProfile();
+  profileDialog.showModal();
 }
 
 function showNotice(message) {
@@ -328,5 +356,10 @@ promptInput.addEventListener("keydown", (event) => {
 
 try {
   if (localStorage.getItem(THEME_KEY) === "light") document.documentElement.classList.add("light");
+  const savedProfile = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null");
+  if (savedProfile && typeof savedProfile === "object") profile = { name: typeof savedProfile.name === "string" ? savedProfile.name.slice(0, 60) : "", email: typeof savedProfile.email === "string" ? savedProfile.email.slice(0, 120) : "" };
 } catch { /* Private browsing may disable local storage. */ }
+profileButton.addEventListener("click", openProfile);
+document.querySelector("#profile-save").addEventListener("click", (event) => { event.preventDefault(); if (!profileEmail.validity.valid) { profileEmail.reportValidity(); return; } saveProfile(); });
+renderProfile();
 loadConfig().catch((error) => showNotice(`Connection problem: ${error.message} Configure runtime-config.js with the URL of your Audora API, or host the UI and API together.`));
