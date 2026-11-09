@@ -95,11 +95,15 @@ async function streamProviderResponse(providerResponse, provider, response, sign
   });
   response.flushHeaders?.();
   const send = (event, data) => {
-    if (!response.writableEnded && !response.destroyed) response.write(`event: ${event}\\ndata: ${JSON.stringify(data)}\\n\\n`);
+    if (!response.writableEnded && !response.destroyed) response.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`);
   };
-  const decoder = new TextDecoder();
   const reader = providerResponse.body?.getReader();
-  if (!reader) throw new Error("The inference provider returned no stream.");
+  if (!reader) {
+    send("error", { error: "The inference provider returned no stream." });
+    response.end();
+    return;
+  }
+  const decoder = new TextDecoder();
   let buffer = "";
   let fullText = "";
   const consume = (line) => {
@@ -113,14 +117,12 @@ async function streamProviderResponse(providerResponse, provider, response, sign
     }
     try {
       const chunk = JSON.parse(raw);
-      const delta = provider === "ollama"
-        ? (chunk.message?.content || "")
-        : (chunk.choices?.[0]?.delta?.content || "");
+      if (chunk.error) throw new Error("The inference provider reported a stream error.");
+      const delta = provider === "ollama" ? (chunk.message?.content || "") : (chunk.choices?.[0]?.delta?.content || "");
       if (typeof delta === "string" && delta) {
         fullText += delta;
         send("delta", { text: delta });
       }
-      if (chunk.error) throw new Error("The inference provider reported a stream error.");
     } catch (error) {
       if (error instanceof SyntaxError) return;
       throw error;
@@ -131,15 +133,17 @@ async function streamProviderResponse(providerResponse, provider, response, sign
       const { value, done } = await reader.read();
       if (done) break;
       buffer += decoder.decode(value, { stream: true });
-      const lines = buffer.split(/\\r?\\n/);
+      const lines = buffer.split(/\r?\n/);
       buffer = lines.pop() || "";
       for (const line of lines) consume(line);
     }
     if (buffer.trim()) consume(buffer);
     if (!signal.aborted) send("done", { message: fullText });
-    if (!response.writableEnded) response.end();
+  } catch {
+    if (!signal.aborted) send("error", { error: "The model stream was interrupted. Please retry." });
   } finally {
     reader.releaseLock();
+    if (!response.writableEnded) response.end();
   }
 }
 
