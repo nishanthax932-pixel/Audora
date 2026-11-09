@@ -15,7 +15,9 @@
       <aside class="sidebar">
         <div class="sidebar-top"><a class="brand" href="/" aria-label="Home"><span class="orb"></span><span data-brand>Audora</span></a><button class="icon-button mobile-only" id="close-sidebar" aria-label="Close menu">×</button></div>
         <button class="new-chat" id="new-chat"><span>＋</span> New chat</button>
-        <nav id="history" aria-label="Chat history"><p class="nav-label">RECENT</p></nav>
+        <label class="sr-only" for="history-search">Search conversations</label>
+        <input id="history-search" class="history-search" type="search" placeholder="Search chats" autocomplete="off" />
+        <nav id="history" aria-label="Chat history"></nav>
         <div class="sidebar-footer"><button class="workspace"><span class="workspace-mark" data-brand-initial>A</span><span><b data-brand>Audora</b><small data-tagline>Your intelligent workspace</small></span><span>···</span></button></div>
       </aside>
       <main class="workspace-main">
@@ -24,7 +26,7 @@
           <div class="empty-state" id="empty-state"><div class="big-orb">✦</div><h1 id="welcome-heading">How can I help you?</h1><p>Ask, create, analyze, or explore anything.</p><div class="suggestions"><button>Help me plan a project</button><button>Explain a complex idea</button><button>Write and improve text</button></div></div>
           <div class="conversation" id="conversation" aria-live="polite"></div>
         </section>
-        <div class="composer-wrap"><form id="chat-form" class="composer"><label class="sr-only" for="prompt">Message the assistant</label><textarea id="prompt" rows="1" maxlength="8000" placeholder="Message Audora" required></textarea><button type="submit" aria-label="Send message"><span>↑</span></button></form><p class="hint"><span data-brand>Audora</span> can make mistakes. Check important info.</p></div>
+        <div class="composer-wrap"><div id="app-notice" class="app-notice" role="status" hidden></div><form id="chat-form" class="composer"><label class="sr-only" for="prompt">Message the assistant</label><textarea id="prompt" rows="1" maxlength="8000" placeholder="Message Audora" required></textarea><button id="stop-button" class="stop-button" type="button" aria-label="Stop generating" hidden>■</button><button id="send-button" type="submit" aria-label="Send message"><span>↑</span></button></form><p class="hint"><span data-brand>Audora</span> can make mistakes. Check important info.</p></div>
       </main>
     </div>
     <script src="/runtime-config.js"></script>
