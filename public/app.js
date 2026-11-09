@@ -294,7 +294,7 @@ document.querySelector("#export-chats").addEventListener("click", () => {
   link.href = url;
   link.download = `audora-chats-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
-  URL.revokeObjectURL(url);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 });
 document.querySelector("#new-chat").addEventListener("click", () => {
   if (isGenerating) return;
