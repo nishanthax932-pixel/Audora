@@ -202,7 +202,8 @@ export function createApp(environment = process.env) {
       if (!response.headersSent) return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "Image generation timed out. Try a simpler prompt." : "Audora could not reach the image provider." });
     } finally { clearTimeout(timer); }
   });
-\n  app.use((error, _request, response, _next) => {
+
+  app.use((error, _request, response, _next) => {
     if (response.headersSent) return;
     const status = error?.type === "entity.too.large" ? 413 : error?.type === "entity.parse.failed" ? 400 : 500;
     const message = status === 413 ? "Request body is too large." : status === 400 ? "Request body must contain valid JSON." : "An unexpected server error occurred.";
