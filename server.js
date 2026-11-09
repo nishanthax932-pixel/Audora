@@ -84,6 +84,65 @@ function validMessages(messages) {
   );
 }
 
+
+async function streamProviderResponse(providerResponse, provider, response, signal) {
+  response.status(200);
+  response.set({
+    "Content-Type": "text/event-stream; charset=utf-8",
+    "Cache-Control": "no-cache, no-transform",
+    "Connection": "keep-alive",
+    "X-Accel-Buffering": "no"
+  });
+  response.flushHeaders?.();
+  const send = (event, data) => {
+    if (!response.writableEnded && !response.destroyed) response.write(`event: ${event}\\ndata: ${JSON.stringify(data)}\\n\\n`);
+  };
+  const decoder = new TextDecoder();
+  const reader = providerResponse.body?.getReader();
+  if (!reader) throw new Error("The inference provider returned no stream.");
+  let buffer = "";
+  let fullText = "";
+  const consume = (line) => {
+    const trimmed = line.trim();
+    if (!trimmed) return;
+    let raw = trimmed;
+    if (provider === "compatible") {
+      if (!raw.startsWith("data:")) return;
+      raw = raw.slice(5).trim();
+      if (raw === "[DONE]") return;
+    }
+    try {
+      const chunk = JSON.parse(raw);
+      const delta = provider === "ollama"
+        ? (chunk.message?.content || "")
+        : (chunk.choices?.[0]?.delta?.content || "");
+      if (typeof delta === "string" && delta) {
+        fullText += delta;
+        send("delta", { text: delta });
+      }
+      if (chunk.error) throw new Error("The inference provider reported a stream error.");
+    } catch (error) {
+      if (error instanceof SyntaxError) return;
+      throw error;
+    }
+  };
+  try {
+    while (!signal.aborted) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split(/\\r?\\n/);
+      buffer = lines.pop() || "";
+      for (const line of lines) consume(line);
+    }
+    if (buffer.trim()) consume(buffer);
+    if (!signal.aborted) send("done", { message: fullText });
+    if (!response.writableEnded) response.end();
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export function createApp(environment = process.env) {
   const settings = getSettings(environment);
   const app = express();
@@ -155,11 +214,11 @@ export function createApp(environment = process.env) {
     try {
       const headers = { "Content-Type": "application/json" };
       if (settings.provider === "compatible") headers.Authorization = `Bearer ${settings.apiKey}`;
+      const wantsStream = request.body?.stream === true;
       const providerBody = settings.provider === "ollama"
-        ? { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...messages], stream: false, options: { temperature: 0.7 } }
-        : { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...messages], temperature: 0.7 };
+        ? { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...messages], stream: wantsStream, options: { temperature: 0.7 } }
+        : { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...messages], temperature: 0.7, stream: wantsStream };
       const providerResponse = await fetch(settings.apiUrl, { method: "POST", signal: aborter.signal, headers, body: JSON.stringify(providerBody) });
-      const payload = await providerResponse.json().catch(() => ({}));
       if (!providerResponse.ok) {
         const status = providerResponse.status >= 400 && providerResponse.status < 600 ? providerResponse.status : 502;
         // Provider error bodies can contain internal URLs, account details, or
@@ -167,6 +226,11 @@ export function createApp(environment = process.env) {
         console.error("Audora provider request failed", { status, provider: settings.provider });
         return response.status(status).json({ error: "The inference provider could not complete this request. Please try again or check the server configuration." });
       }
+      if (wantsStream) {
+        await streamProviderResponse(providerResponse, settings.provider, response, aborter.signal);
+        return;
+      }
+      const payload = await providerResponse.json().catch(() => ({}));
       return response.json({ message: settings.provider === "ollama" ? (payload.message?.content || "The local model returned an empty response.") : (payload.choices?.[0]?.message?.content || "The model returned an empty response."), model: model.label });
     } catch (error) {
       const unreachable = settings.provider === "ollama" ? "Audora could not reach Ollama. Start Ollama and pull the model named in .env." : "Audora could not reach the local inference server. Start vLLM and check AUDORA_API_URL.";
