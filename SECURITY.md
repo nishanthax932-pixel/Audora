@@ -21,7 +21,5 @@ disclosure.
 - Use HTTPS and a trusted reverse proxy; configure `AUDORA_TRUST_PROXY`
   deliberately rather than trusting arbitrary forwarded headers.
 - The included in-memory rate limiter is not a shared production limiter.
-- The default free provider sends prompts to an external service. Do not send
-  secrets or sensitive personal information through that mode.
 - Configure authentication, durable storage, monitoring, and provider spend
   limits before exposing a multi-user production service.
