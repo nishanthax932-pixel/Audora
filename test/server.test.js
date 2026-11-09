@@ -234,7 +234,7 @@ test("streams compatible-provider tokens as server-sent events", { concurrency: 
   globalThis.fetch = async (url, options) => {
     if (String(url) === "https://provider.invalid/stream") {
       assert.equal(JSON.parse(options.body).stream, true);
-      return new Response('data: {"choices":[{"delta":{"content":"Hello "}}]}\\n\\ndata: {"choices":[{"delta":{"content":"Audora"}}]}\\n\\ndata: [DONE]\\n\\n', {
+      return new Response('data: {"choices":[{"delta":{"content":"Hello "}}]}\n\ndata: {"choices":[{"delta":{"content":"Audora"}}]}\n\ndata: [DONE]\n\n', {
         status: 200,
         headers: { "Content-Type": "text/event-stream" }
       });
@@ -253,7 +253,7 @@ test("streams compatible-provider tokens as server-sent events", { concurrency: 
         body: JSON.stringify({ messages: [{ role: "user", content: "Say hello" }], stream: true })
       });
       assert.equal(response.status, 200);
-      assert.match(response.headers.get("content-type"), /text\\/event-stream/);
+      assert.ok(response.headers.get("content-type").includes("text/event-stream"));
       const body = await response.text();
       assert.match(body, /event: delta/);
       assert.match(body, /Hello /);
