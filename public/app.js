@@ -14,6 +14,8 @@ const profileEmail = document.querySelector("#profile-email");
 const profileMemory = document.querySelector("#profile-memory");
 const PROFILE_KEY = "audora-profile-v1";
 const fileInput = document.querySelector("#file-input");
+const thinkingModeButton = document.querySelector("#thinking-mode");
+let thinkingMode = false;
 const attachmentList = document.querySelector("#attachment-list");
 let attachments = [];
 let profile = { name: "", email: "" };
@@ -258,6 +260,7 @@ function setGenerating(value) {
   isGenerating = value;
   sendButton.disabled = value;
   stopButton.hidden = !value;
+  thinkingModeButton.disabled = value;
   promptInput.disabled = value;
   modelSelect.disabled = value;
 }
@@ -294,7 +297,7 @@ async function sendMessage(content) {
       signal: controller.signal,
       // The API accepts at most 40 context messages. Keep the longer local
       // transcript for history, but send only the newest supported context.
-      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model, memory: profile.memory || "" })
+      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode })
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `Audora request failed (${response.status}).`);
@@ -374,6 +377,13 @@ function renderAttachments() {
 }
 
 document.querySelector("#attach-files").addEventListener("click", () => fileInput.click());
+thinkingModeButton.addEventListener("click", () => {
+  thinkingMode = !thinkingMode;
+  thinkingModeButton.setAttribute("aria-pressed", String(thinkingMode));
+  thinkingModeButton.classList.toggle("active", thinkingMode);
+  thinkingModeButton.title = thinkingMode ? "Detailed explanation mode is on" : "Detailed explanation mode";
+  showNotice(thinkingMode ? "Detailed explanation mode enabled: Audora will show more solution steps and checks." : "Detailed explanation mode disabled.");
+});
 fileInput.addEventListener("change", async () => {
   const selected = Array.from(fileInput.files || []).slice(0, 4 - attachments.length);
   for (const file of selected) {
