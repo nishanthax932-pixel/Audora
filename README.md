@@ -33,6 +33,20 @@ an OpenAI-compatible hosted provider (`AUDORA_PROVIDER=compatible`,
 (`AUDORA_PROVIDER=ollama`, no cloud key needed). Keep API keys only in
 environment variables - never in browser code.
 
+## Chat history and privacy
+
+Chat history is stored in the current browser's local storage on that device.
+It is not synced between devices and there is no account login or cloud chat
+database in this starter version. Use **Export conversations** in the sidebar
+to save a JSON backup. Clearing browser site data can remove local history.
+The UI keeps a bounded number of recent chats and supports searching and
+deleting individual conversations.
+
+The selected inference provider receives the message context sent by the
+server. In the default free mode, prompts are sent to the external free-tier
+provider; local Ollama mode sends prompts to the Ollama host. Do not send
+passwords, API keys, or sensitive personal information to an untrusted provider.
+
 ## Deploy without 404 errors
 
 The browser UI and `/api/*` server must be deployed together, or the UI needs
