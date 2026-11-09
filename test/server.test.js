@@ -15,6 +15,21 @@ test("publishes safe white-label configuration", async () => {
   });
 });
 
+test("defaults to local self-hosted inference and never falls back to a third-party free model", async () => {
+  await withServer({}, async (url) => {
+    const health = await (await fetch(`${url}/api/health`)).json();
+    assert.equal(health.provider, "compatible");
+    assert.equal(health.providerConfigured, false);
+    const response = await fetch(`${url}/api/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] })
+    });
+    assert.equal(response.status, 503);
+    assert.match((await response.json()).error, /local inference server/i);
+  });
+});
+
 test("rejects invalid messages before contacting a provider", async () => {
   await withServer({}, async (url) => {
     const response = await fetch(`${url}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [] }) });
