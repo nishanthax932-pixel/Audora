@@ -2,8 +2,8 @@
 
 **Audora** is a self-hostable AI workspace intended to run open-weight models
 on infrastructure controlled by Audora. It does not silently send prompts to
-a third-party text-generation service. Image generation has been removed
-until an Audora-owned image model and inference stack exist.
+a third-party text-generation service. Optional image generation uses an
+Audora-controlled local Diffusers checkpoint and never calls a hosted image API.
 
 ## Run the workspace
 
@@ -83,7 +83,11 @@ Chat history and profile memory are stored in browser local storage. There is
 no account login, cross-device sync, or cloud chat database in this starter.
 Text/code attachments and safe Markdown rendering are supported. Web search,
 citations, streaming, and multi-step tool execution are not yet implemented.
-Image generation is intentionally unavailable.
+Image generation has a self-hosted UI/API path; it remains disabled until a local Diffusers checkpoint, CUDA GPU, and matching server secret are configured. See `image/README.md`.
+
+## Self-hosted image generation
+
+See `image/README.md` to install the local Diffusers service and provide an already-downloaded, properly licensed SDXL checkpoint. The Node API proxies only to the configured private image service. The model server loads from disk with `local_files_only=True`; it does not download weights or call Pollinations/other hosted image providers. A CUDA GPU and substantial VRAM are required. Do not expose the image service publicly.
 
 ## Tests and production
 
