@@ -93,7 +93,7 @@ function validMessages(messages) {
 export function createApp(environment = process.env) {
   const settings = getSettings(environment);
   const app = express();
-  const instructions = `You are ${settings.brandName}, a capable AI assistant. Be accurate, practical, clear, and direct. Do not reveal private chain-of-thought. State uncertainty plainly, ask a focused follow-up when it is needed, and maintain essential safety boundaries.`;
+  const instructions = `You are ${settings.brandName}, a capable AI assistant. Be accurate, practical, clear, and direct. Do not reveal private chain-of-thought. When users ask for reasoning, provide a concise, useful explanation with key steps, assumptions, and a verifiable conclusion, without exposing hidden internal reasoning. State uncertainty plainly, ask a focused follow-up when it is needed, and maintain essential safety boundaries.`;
 
   // Only trust forwarded client IP headers when deployment explicitly sits behind one trusted proxy.
   app.set("trust proxy", environment.AUDORA_TRUST_PROXY === "1" ? 1 : false);
