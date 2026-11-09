@@ -541,6 +541,7 @@ try {
   if (savedProfile && typeof savedProfile === "object") profile = { name: typeof savedProfile.name === "string" ? savedProfile.name.slice(0, 60) : "", email: typeof savedProfile.email === "string" ? savedProfile.email.slice(0, 120) : "", memory: typeof savedProfile.memory === "string" ? savedProfile.memory.slice(0, 1200) : "" };
 } catch { /* Private browsing may disable local storage. */ }
 profileButton.addEventListener("click", openProfile);
+document.querySelector("#profile-workspace")?.addEventListener("click", openProfile);
 document.querySelector("#profile-save").addEventListener("click", (event) => { event.preventDefault(); if (!profileEmail.validity.valid) { profileEmail.reportValidity(); return; } saveProfile(); });
 renderProfile();
 loadConfig().catch((error) => showNotice(`Connection problem: ${error.message} Configure runtime-config.js with the URL of your Audora API, or host the UI and API together.`));
