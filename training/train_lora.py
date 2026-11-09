@@ -1,7 +1,7 @@
 """Supervised LoRA fine-tuning for an open-weight causal language model.
 
-This starter deliberately does NOT quantize the base model. Select a checkpoint
-that fits your available GPU/RAM. Training only updates LoRA adapter weights.
+The base model is loaded in BF16/FP16/FP32, never in a quantized format.
+Only assistant response tokens contribute to the training loss.
 """
 from __future__ import annotations
 
@@ -10,12 +10,12 @@ import os
 from pathlib import Path
 
 import torch
-from datasets import load_dataset
+from datasets import Dataset
 from peft import LoraConfig, TaskType, get_peft_model
 from transformers import (
     AutoModelForCausalLM,
     AutoTokenizer,
-    DataCollatorForLanguageModeling,
+    DataCollatorForSeq2Seq,
     Trainer,
     TrainingArguments,
 )
@@ -27,13 +27,13 @@ OUTPUT_DIR = Path(os.environ.get("AUDORA_OUTPUT_DIR", ROOT / "output/audora-lora
 MAX_LENGTH = int(os.environ.get("AUDORA_MAX_LENGTH", "1024"))
 
 
-def validate_dataset(path: Path) -> int:
+def load_training_data(path: Path, tokenizer):
     if not path.is_file():
         raise SystemExit(
             f"Training file not found: {path}. Copy training/data/train.example.jsonl "
             "to training/data/train.jsonl and add reviewed examples."
         )
-    count = 0
+    rows = []
     with path.open(encoding="utf-8") as handle:
         for line_number, line in enumerate(handle, start=1):
             if not line.strip():
@@ -42,20 +42,40 @@ def validate_dataset(path: Path) -> int:
                 row = json.loads(line)
             except json.JSONDecodeError as exc:
                 raise SystemExit(f"Invalid JSON on line {line_number}: {exc}") from exc
-            if not isinstance(row.get("prompt"), str) or not row["prompt"].strip():
+            prompt, response = row.get("prompt"), row.get("response")
+            if not isinstance(prompt, str) or not prompt.strip():
                 raise SystemExit(f"Line {line_number}: prompt must be a non-empty string")
-            if not isinstance(row.get("response"), str) or not row["response"].strip():
+            if not isinstance(response, str) or not response.strip():
                 raise SystemExit(f"Line {line_number}: response must be a non-empty string")
-            count += 1
-    if count < 2:
-        raise SystemExit("Add at least two valid prompt/response examples before training.")
-    return count
+
+            messages = [
+                {"role": "user", "content": prompt.strip()},
+                {"role": "assistant", "content": response.strip()},
+            ]
+            prompt_ids = tokenizer.apply_chat_template(
+                messages[:1], tokenize=True, add_generation_prompt=True
+            )
+            full_ids = tokenizer.apply_chat_template(
+                messages, tokenize=True, add_generation_prompt=False
+            )[:MAX_LENGTH]
+            prompt_length = min(len(prompt_ids), len(full_ids))
+            labels = [-100] * prompt_length + full_ids[prompt_length:]
+            if labels and any(label != -100 for label in labels):
+                rows.append({
+                    "input_ids": full_ids,
+                    "attention_mask": [1] * len(full_ids),
+                    "labels": labels,
+                })
+    if len(rows) < 2:
+        raise SystemExit("Add at least two usable prompt/response examples before training.")
+    return Dataset.from_list(rows)
 
 
 def main() -> None:
-    rows = validate_dataset(TRAIN_FILE)
-    print(f"Loading {MODEL_ID}; validated {rows} training examples.")
-    print("Base weights will not be quantized. Ensure the selected model fits available memory.")
+    print(f"Loading {MODEL_ID}; base weights will not be quantized.")
+    print("Ensure the selected checkpoint and training batch fit available memory.")
+    if MAX_LENGTH < 32:
+        raise SystemExit("AUDORA_MAX_LENGTH must be at least 32.")
 
     tokenizer = AutoTokenizer.from_pretrained(MODEL_ID, use_fast=True)
     if tokenizer.pad_token is None:
@@ -69,6 +89,7 @@ def main() -> None:
     model = AutoModelForCausalLM.from_pretrained(MODEL_ID, torch_dtype=dtype)
     model.config.use_cache = False
     model.gradient_checkpointing_enable()
+    model.enable_input_require_grads()
 
     adapter_config = LoraConfig(
         task_type=TaskType.CAUSAL_LM,
@@ -80,22 +101,8 @@ def main() -> None:
     )
     model = get_peft_model(model, adapter_config)
     model.print_trainable_parameters()
+    tokenized = load_training_data(TRAIN_FILE, tokenizer)
 
-    dataset = load_dataset("json", data_files=str(TRAIN_FILE), split="train")
-
-    def format_and_tokenize(batch):
-        texts = [
-            f"### User:\n{prompt.strip()}\n\n### Assistant:\n{response.strip()}{tokenizer.eos_token}"
-            for prompt, response in zip(batch["prompt"], batch["response"])
-        ]
-        return tokenizer(texts, truncation=True, max_length=MAX_LENGTH)
-
-    tokenized = dataset.map(
-        format_and_tokenize,
-        batched=True,
-        remove_columns=dataset.column_names,
-        desc="Tokenizing reviewed examples",
-    )
     args = TrainingArguments(
         output_dir=str(OUTPUT_DIR),
         num_train_epochs=float(os.environ.get("AUDORA_EPOCHS", "3")),
@@ -115,12 +122,15 @@ def main() -> None:
         model=model,
         args=args,
         train_dataset=tokenized,
-        data_collator=DataCollatorForLanguageModeling(tokenizer=tokenizer, mlm=False),
+        data_collator=DataCollatorForSeq2Seq(
+            tokenizer=tokenizer, padding=True, label_pad_token_id=-100
+        ),
     )
     trainer.train()
-    model.save_pretrained(OUTPUT_DIR / "final-adapter")
-    tokenizer.save_pretrained(OUTPUT_DIR / "final-adapter")
-    print(f"LoRA adapter saved to {OUTPUT_DIR / 'final-adapter'}")
+    final_path = OUTPUT_DIR / "final-adapter"
+    model.save_pretrained(final_path)
+    tokenizer.save_pretrained(final_path)
+    print(f"LoRA adapter saved to {final_path}")
 
 
 if __name__ == "__main__":
