@@ -74,3 +74,8 @@
 .profile-dialog textarea{width:100%;resize:vertical;min-height:88px;padding:12px 13px;border-radius:9px;border:1px solid #454545;background:#292929;color:#eee;outline:none;font:inherit;font-size:13px;line-height:1.5}
 .profile-dialog textarea:focus{border-color:var(--accent)}
 .light .profile-dialog textarea{background:#f8f8f8;color:#222;border-color:#ddd}
+
+.image-mode[aria-pressed="true"],.image-mode.active{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
+.generated-image{display:block;max-width:min(100%,720px);max-height:70vh;object-fit:contain;border-radius:12px;margin:8px 0;border:1px solid #ffffff22}
+.image-download{display:inline-flex;margin:4px 0 8px;color:var(--accent);font-size:13px;font-weight:700;text-decoration:none}
+.image-download:hover{text-decoration:underline}
