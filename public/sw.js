@@ -4,6 +4,7 @@ const APP_SHELL = [
   "/index.html",
   "/styles.css",
   "/app.js",
+  "/assistants.js",
   "/image.js",
   "/pwa.js",
   "/runtime-config.js",
