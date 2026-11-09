@@ -1,0 +1,47 @@
+name: audora
+
+services:
+  inference:
+    image: vllm/vllm-openai:latest
+    command:
+      - --model
+      - /models/audora
+      - --served-model-name
+      - audora-local
+      - --dtype
+      - bfloat16
+      - --api-key
+      - ${AUDORA_API_KEY:?Set AUDORA_API_KEY in .env}
+    volumes:
+      - ${AUDORA_MODEL_DIR:-./models/audora}:/models/audora:ro
+    environment:
+      HF_HUB_OFFLINE: "1"
+      TRANSFORMERS_OFFLINE: "1"
+    ipc: host
+    gpus: all
+    restart: unless-stopped
+    networks: [backend]
+
+  app:
+    build: .
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      AUDORA_PROVIDER: compatible
+      AUDORA_API_URL: http://inference:8000/v1/chat/completions
+      AUDORA_API_KEY: ${AUDORA_API_KEY:?Set AUDORA_API_KEY in .env}
+      AUDORA_MODEL: audora-local
+      AUDORA_BRAND_NAME: ${AUDORA_BRAND_NAME:-Audora}
+      AUDORA_BRAND_TAGLINE: ${AUDORA_BRAND_TAGLINE:-Your intelligent workspace}
+      AUDORA_RATE_LIMIT_MAX: ${AUDORA_RATE_LIMIT_MAX:-30}
+      AUDORA_RATE_LIMIT_WINDOW_MS: ${AUDORA_RATE_LIMIT_WINDOW_MS:-60000}
+    ports:
+      - "127.0.0.1:${AUDORA_PORT:-3000}:3000"
+    depends_on:
+      - inference
+    restart: unless-stopped
+    networks: [backend]
+
+networks:
+  backend:
+    driver: bridge
