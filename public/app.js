@@ -248,8 +248,22 @@ async function loadConfig() {
   promptInput.placeholder = `Message ${config.brandName}`;
   modelSelect.replaceChildren(...config.models.map((model) => new Option(model.label, model.id)));
 
-  try { chats = normalizeChats(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")); }
-  catch { chats = []; }
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_KEY) || "null");
+    if (Array.isArray(saved)) {
+      chats = normalizeChats(saved);
+    } else {
+      // Migrate the previous single-thread local history without losing it.
+      const legacy = JSON.parse(localStorage.getItem("audora-conversations-v1") || "null");
+      if (Array.isArray(legacy) && legacy.length) {
+        const messages = legacy.filter((message) => ["user", "assistant"].includes(message?.role) && typeof message.content === "string");
+        if (messages.length) {
+          chats = [{ id: createId(), title: titleFrom(messages), createdAt: Date.now(), updatedAt: Date.now(), model: config.models[0]?.id || "", messages: messages.slice(-MAX_LOCAL_MESSAGES) }];
+          safeSave();
+        }
+      }
+    }
+  } catch { chats = []; }
   activeChatId = chats[0]?.id || null;
   renderHistory();
   renderChat();
@@ -270,7 +284,8 @@ document.querySelector("#new-chat").addEventListener("click", () => {
 });
 document.querySelector("#theme-toggle").addEventListener("click", () => {
   document.documentElement.classList.toggle("light");
-  localStorage.setItem(THEME_KEY, document.documentElement.classList.contains("light") ? "light" : "dark");
+  try { localStorage.setItem(THEME_KEY, document.documentElement.classList.contains("light") ? "light" : "dark"); }
+  catch { showNotice("Theme changed for this session; browser storage is unavailable."); }
 });
 document.querySelector("#open-sidebar").addEventListener("click", () => document.querySelector(".sidebar").classList.add("open"));
 document.querySelector("#close-sidebar").addEventListener("click", () => document.querySelector(".sidebar").classList.remove("open"));
@@ -292,5 +307,7 @@ promptInput.addEventListener("keydown", (event) => {
   }
 });
 
-if (localStorage.getItem(THEME_KEY) === "light") document.documentElement.classList.add("light");
+try {
+  if (localStorage.getItem(THEME_KEY) === "light") document.documentElement.classList.add("light");
+} catch { /* Private browsing may disable local storage. */ }
 loadConfig().catch((error) => showNotice(`Connection problem: ${error.message} Configure runtime-config.js with the URL of your Audora API, or host the UI and API together.`));
