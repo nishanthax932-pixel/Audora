@@ -210,7 +210,9 @@ async function sendMessage(content) {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
-      body: JSON.stringify({ messages: chat.messages.slice(-MAX_LOCAL_MESSAGES), model: chat.model })
+      // The API accepts at most 40 context messages. Keep the longer local
+      // transcript for history, but send only the newest supported context.
+      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model })
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `Audora request failed (${response.status}).`);
