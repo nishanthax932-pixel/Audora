@@ -42,7 +42,7 @@ Two starter paths are included:
 
 - `training/train.py`: full fine-tuning with the original model loaded in
   BF16/FP16; no quantized loading and no LoRA adapters.
-- `training/train_lora.py`: a lower-memory LoRA/PEFT option that trains
+- `training/train_lora.py`: lower-memory LoRA/PEFT option that trains
   adapter weights while leaving the base model frozen.
 
 Full fine-tuning requires substantially more GPU memory because weights,
@@ -50,20 +50,21 @@ gradients, optimizer states, and activations all consume memory. LoRA is more
 practical on smaller GPUs, but it does not change the base weights. Neither
 method is training a foundation model from scratch.
 
-For full fine-tuning, prepare a reviewed, permissioned JSONL dataset and run:
+For full fine-tuning, copy the example data, add your reviewed examples, and run:
 
 ```bash
+cp training/data/train.example.jsonl training/data/train.jsonl
 pip install -r training/requirements.txt
-python training/train.py --model Qwen/Qwen2.5-0.5B-Instruct --data data/audora_train.jsonl --output models/audora-checkpoint
+python training/train.py --model Qwen/Qwen2.5-0.5B-Instruct --data training/data/train.jsonl --output models/audora-checkpoint
 ```
 
-For the LoRA path, follow the instructions in `training/train_lora.py` and
-the example dataset under `training/data/`. Install a CUDA-compatible
-PyTorch build first. GitHub stores source code and configuration; it does not
-provide the GPU compute or storage needed to train a model. Check model and
-dataset licenses, use only data you have permission to train on, remove
-personal information, deduplicate examples, and keep a held-out evaluation
-set. Fine-tuning does not automatically make every answer more accurate.
+For LoRA, follow the instructions in `training/train_lora.py`. Install a
+CUDA-compatible PyTorch build first. GitHub stores source code and
+configuration; it does not provide the GPU compute or storage needed to train
+a model. Check model and dataset licenses, use only data you have permission
+to train on, remove personal information, deduplicate examples, and keep a
+held-out evaluation set. Fine-tuning does not automatically make every answer
+more accurate.
 
 After training, serve the resulting full checkpoint or merged adapter with
 vLLM and configure `AUDORA_API_URL`, `AUDORA_API_KEY`, and `AUDORA_MODEL`
