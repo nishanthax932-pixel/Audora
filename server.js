@@ -194,11 +194,10 @@ export function createApp(environment = process.env) {
       response.setHeader("Content-Type", contentType);
       response.setHeader("Cache-Control", "no-store");
       response.setHeader("X-Content-Type-Options", "nosniff");
-      return upstream.body.pipeTo(new WritableStream({
-        write(chunk) { response.write(Buffer.from(chunk)); },
-        close() { response.end(); },
-        abort() { if (!response.writableEnded) response.end(); }
-      })).catch(() => { if (!response.writableEnded) response.end(); });
+      const imageBytes = Buffer.from(await upstream.arrayBuffer());
+      if (imageBytes.length > 12 * 1024 * 1024) return response.status(502).json({ error: "The generated image exceeded the allowed size." });
+      response.setHeader("Content-Length", imageBytes.length);
+      return response.end(imageBytes);
     } catch (error) {
       if (!response.headersSent) return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "Image generation timed out. Try a simpler prompt." : "Audora could not reach the image provider." });
     } finally { clearTimeout(timer); }
