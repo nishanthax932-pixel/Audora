@@ -70,3 +70,7 @@
 .light .message-content code{background:#0000000c}
 .light .attach-button{border-color:#ccc!important}
 .light .attachment-chip{background:#edf3fb;color:#34506d;border-color:#ccd9e8}
+
+.profile-dialog textarea{width:100%;resize:vertical;min-height:88px;padding:12px 13px;border-radius:9px;border:1px solid #454545;background:#292929;color:#eee;outline:none;font:inherit;font-size:13px;line-height:1.5}
+.profile-dialog textarea:focus{border-color:var(--accent)}
+.light .profile-dialog textarea{background:#f8f8f8;color:#222;border-color:#ddd}
