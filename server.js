@@ -37,6 +37,9 @@ function getSettings(environment = process.env) {
     models: models.length ? models : [{ id: fallbackModel, label: "Audora Core" }],
     provider,
     apiKey: environment.AUDORA_API_KEY,
+    imageApiKey: environment.AUDORA_IMAGE_API_KEY,
+    imageApiUrl: environment.AUDORA_IMAGE_API_URL || "https://gen.pollinations.ai/image",
+    imageModel: environment.AUDORA_IMAGE_MODEL || "black-forest-labs/flux.1-schnell",
     apiUrl: provider === "ollama"
       ? (environment.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat")
       : provider === "free"
@@ -140,7 +143,7 @@ export function createApp(environment = process.env) {
       if (settings.provider === "compatible") headers.Authorization = `Bearer ${settings.apiKey}`;
       const providerBody = settings.provider === "ollama"
         ? { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...messages], stream: false, options: { temperature: 0.7 } }
-        : { model: model.id, messages: [{ role: "system", content: instructions }, ...messages], temperature: 0.7 };
+        : { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...messages], temperature: 0.7 };
       const providerResponse = await fetch(settings.apiUrl, { method: "POST", signal: aborter.signal, headers, body: JSON.stringify(providerBody) });
       const payload = await providerResponse.json().catch(() => ({}));
       if (!providerResponse.ok) {
@@ -160,7 +163,47 @@ export function createApp(environment = process.env) {
       return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "The model took too long to respond. Please try again." : unreachable });
     } finally { clearTimeout(timer); }
   });
-  app.use((error, _request, response, _next) => {
+
+  app.post("/api/image", createRateLimiter(settings), async (request, response) => {
+    const { prompt, model: requestedImageModel, width, height } = request.body || {};
+    if (typeof prompt !== "string" || !prompt.trim() || prompt.length > 2000) {
+      return response.status(400).json({ error: "Provide an image prompt up to 2,000 characters." });
+    }
+    if (!settings.imageApiKey) {
+      return response.status(503).json({ error: "Image generation is not configured yet. Add AUDORA_IMAGE_API_KEY as a server-side secret to enable it." });
+    }
+    const imageModel = typeof requestedImageModel === "string" && /^[a-zA-Z0-9._/-]{1,120}$/.test(requestedImageModel)
+      ? requestedImageModel : settings.imageModel;
+    const imageWidth = Number.isInteger(width) ? Math.min(Math.max(width, 256), 1536) : 1024;
+    const imageHeight = Number.isInteger(height) ? Math.min(Math.max(height, 256), 1536) : 1024;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), settings.timeoutMs);
+    response.on("close", () => { if (!response.writableEnded) controller.abort(); });
+    try {
+      const url = new URL(`${settings.imageApiUrl.replace(/\/$/, "")}/${encodeURIComponent(prompt.trim())}`);
+      url.searchParams.set("model", imageModel);
+      url.searchParams.set("width", String(imageWidth));
+      url.searchParams.set("height", String(imageHeight));
+      const upstream = await fetch(url, { headers: { Authorization: `Bearer ${settings.imageApiKey}` }, signal: controller.signal });
+      if (!upstream.ok) {
+        console.error("Audora image provider failed", { status: upstream.status });
+        return response.status(upstream.status === 429 ? 429 : 502).json({ error: upstream.status === 402 ? "Image generation credits are exhausted. Check the image provider account." : "The image provider could not generate this image. Please try again." });
+      }
+      const contentType = upstream.headers.get("content-type") || "";
+      if (!contentType.startsWith("image/") || !upstream.body) return response.status(502).json({ error: "The image provider returned an unsupported response." });
+      response.setHeader("Content-Type", contentType);
+      response.setHeader("Cache-Control", "no-store");
+      response.setHeader("X-Content-Type-Options", "nosniff");
+      return upstream.body.pipeTo(new WritableStream({
+        write(chunk) { response.write(Buffer.from(chunk)); },
+        close() { response.end(); },
+        abort() { if (!response.writableEnded) response.end(); }
+      })).catch(() => { if (!response.writableEnded) response.end(); });
+    } catch (error) {
+      if (!response.headersSent) return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "Image generation timed out. Try a simpler prompt." : "Audora could not reach the image provider." });
+    } finally { clearTimeout(timer); }
+  });
+\n  app.use((error, _request, response, _next) => {
     if (response.headersSent) return;
     const status = error?.type === "entity.too.large" ? 413 : error?.type === "entity.parse.failed" ? 400 : 500;
     const message = status === 413 ? "Request body is too large." : status === 400 ? "Request body must contain valid JSON." : "An unexpected server error occurred.";
