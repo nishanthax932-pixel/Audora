@@ -33,7 +33,11 @@ jobs:
         run: |
           npm audit --json > "$RUNNER_TEMP/audora-audit.json" || true
           node --input-type=commonjs -e 'const a = require(process.env.RUNNER_TEMP + "/audora-audit.json"); for (const [name, item] of Object.entries(a.vulnerabilities || {})) console.log(JSON.stringify({name, severity:item.severity, direct:item.isDirect, range:item.range, via:item.via, fixAvailable:item.fixAvailable}));'
+      - name: Enforce dependency audit
+        run: npm audit --audit-level=moderate
       - name: Check syntax
         run: npm run build
       - name: Run tests
         run: npm test
+      - name: Build production container
+        run: docker build --tag audora-ci .
