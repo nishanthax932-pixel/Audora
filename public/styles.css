@@ -64,6 +64,7 @@
 .message-content pre code{background:transparent;padding:0;white-space:pre}
 .attach-button{background:transparent!important;color:var(--text)!important;border:1px solid #555!important;font-size:20px!important}
 .attach-button:hover{background:#444!important}
+#thinking-mode[aria-pressed="true"]{background:var(--accent)!important;color:#fff!important;border-color:var(--accent)!important}
 .attachment-list{display:flex;flex-wrap:wrap;gap:6px;max-width:800px;margin:0 auto 8px}
 .attachment-chip{font-size:11px;color:#c9d5e8;background:#26364a;border:1px solid #3b526f;border-radius:8px;padding:6px 9px;max-width:100%;overflow-wrap:anywhere}
 .light .message-content pre{background:#f3f3f3;border-color:#ddd}
