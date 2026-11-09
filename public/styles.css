@@ -96,3 +96,10 @@
 .light .engine-status[data-state="configured"]{color:#205d40;background:#eaf7ef;border-color:#b8ddc7}
 .light .engine-status[data-state="error"]{color:#8c2f28;background:#fff0ee;border-color:#e8b9b4}
 @media(max-width:700px){.engine-status{max-width:46vw;font-size:9px;padding:5px 7px}.suggestions{gap:7px}.suggestions button{padding:8px 10px}}
+
+
+/* Installable mobile app / safe-area support */
+.install-app{border:1px solid #4b6b60;border-radius:999px;padding:7px 11px;background:#17372e;color:#d9fff0;font-size:12px;font-weight:700;cursor:pointer;white-space:nowrap}
+.install-app[hidden]{display:none}
+@supports(padding:max(0px)){.composer-wrap{padding-bottom:max(17px,env(safe-area-inset-bottom))}.topbar{padding-top:env(safe-area-inset-top)}}
+@media(max-width:700px){.topbar{gap:6px}.model-menu{min-width:0;max-width:42vw}.model-menu select{max-width:100%;overflow:hidden;text-overflow:ellipsis}.topbar-actions{gap:5px}.install-app{padding:7px 9px;font-size:11px}.composer-wrap{padding-left:max(12px,env(safe-area-inset-left));padding-right:max(12px,env(safe-area-inset-right))}.composer{gap:6px;padding:8px}.composer button{width:30px;height:30px}.composer textarea{font-size:16px}.chat-stage{padding-bottom:190px}.profile-dialog{max-height:calc(100dvh - 24px);overflow:auto}}
