@@ -321,3 +321,33 @@ test("reports setup state and optional workspace services without claiming live 
     assert.equal(health.liveInferenceVerified, false);
   });
 });
+
+
+test("passes bounded custom assistant instructions without replacing core safety instructions", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://provider.invalid/")) {
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Custom assistant response" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "compatible", AUDORA_API_URL: "https://provider.invalid/chat", AUDORA_API_KEY: "test-only" }, async (url) => {
+      const response = await originalFetch(url + "/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Help me study" }],
+          assistantInstructions: "You are a patient science tutor. Explain with simple examples."
+        })
+      });
+      assert.equal(response.status, 200);
+      const systemPrompt = requestBody.messages[0].content;
+      assert.match(systemPrompt, /patient science tutor/);
+      assert.match(systemPrompt, /safety boundaries/i);
+      assert.match(systemPrompt, /Do not reveal private internal chain-of-thought/i);
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
