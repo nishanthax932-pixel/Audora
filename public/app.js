@@ -1,111 +1,296 @@
 const form = document.querySelector("#chat-form");
-const prompt = document.querySelector("#prompt");
-const conversation = document.querySelector("#conversation");
+const promptInput = document.querySelector("#prompt");
+const conversationView = document.querySelector("#conversation");
 const emptyState = document.querySelector("#empty-state");
 const modelSelect = document.querySelector("#model-select");
-const history = document.querySelector("#history");
-const messages = [];
-let config = { brandName: "Audora", welcomeMessage: "How can I help you today?", models: [{ id: "audora-core", label: "Audora Core" }] };
-const storageKey = "audora-conversations-v1";
+const historyView = document.querySelector("#history");
+const historySearch = document.querySelector("#history-search");
+const sendButton = document.querySelector("#send-button");
+const stopButton = document.querySelector("#stop-button");
+
+const STORAGE_KEY = "audora-workspace-v2";
+const THEME_KEY = "audora-theme-v1";
+const MAX_LOCAL_CHATS = 60;
+const MAX_LOCAL_MESSAGES = 160;
 const apiBaseUrl = String(window.AUDORA_RUNTIME_CONFIG?.apiBaseUrl || "").replace(/\/$/, "");
 const apiUrl = (path) => `${apiBaseUrl}${path}`;
 
-function addMessage(role, content) {
+let config = {
+  brandName: "Audora",
+  tagline: "Your intelligent workspace",
+  accentColor: "#805ad5",
+  welcomeMessage: "How can I help you today?",
+  models: [{ id: "openai", label: "Audora Core" }]
+};
+let chats = [];
+let activeChatId = null;
+let controller = null;
+let isGenerating = false;
+
+const createId = () => globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(36).slice(2)}`;
+const currentChat = () => chats.find((chat) => chat.id === activeChatId);
+
+function safeSave() {
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(chats.slice(0, MAX_LOCAL_CHATS)));
+  } catch {
+    showNotice("Local storage is full. Export or delete older chats to save more.");
+  }
+}
+
+function showNotice(message) {
+  const node = document.querySelector("#app-notice");
+  if (node) {
+    node.textContent = message;
+    node.hidden = false;
+  }
+}
+
+function makeChat() {
+  const chat = { id: createId(), title: "New chat", createdAt: Date.now(), updatedAt: Date.now(), model: modelSelect.value || config.models[0]?.id, messages: [] };
+  chats.unshift(chat);
+  activeChatId = chat.id;
+  safeSave();
+  renderHistory();
+  renderChat();
+  promptInput.focus();
+}
+
+function titleFrom(messages) {
+  const first = messages.find((message) => message.role === "user")?.content || "New chat";
+  return first.replace(/\s+/g, " ").slice(0, 52);
+}
+
+function normalizeChats(value) {
+  if (!Array.isArray(value)) return [];
+  return value.slice(0, MAX_LOCAL_CHATS).map((chat) => ({
+    id: typeof chat.id === "string" ? chat.id : createId(),
+    title: typeof chat.title === "string" ? chat.title.slice(0, 80) : "New chat",
+    createdAt: Number(chat.createdAt) || Date.now(),
+    updatedAt: Number(chat.updatedAt) || Date.now(),
+    model: typeof chat.model === "string" ? chat.model : "",
+    messages: Array.isArray(chat.messages) ? chat.messages.slice(-MAX_LOCAL_MESSAGES).filter((message) =>
+      ["user", "assistant"].includes(message?.role) && typeof message.content === "string" && message.content.length <= 24000
+    ) : []
+  }));
+}
+
+function renderHistory() {
+  const query = (historySearch?.value || "").trim().toLowerCase();
+  historyView.replaceChildren();
+  const label = document.createElement("p");
+  label.className = "nav-label";
+  label.textContent = "YOUR CHATS";
+  historyView.append(label);
+
+  const visibleChats = chats.filter((chat) => !query || chat.title.toLowerCase().includes(query) || chat.messages.some((message) => message.content.toLowerCase().includes(query)));
+  if (!visibleChats.length) {
+    const empty = document.createElement("p");
+    empty.className = "history-empty";
+    empty.textContent = query ? "No matching chats" : "Your conversations will appear here";
+    historyView.append(empty);
+    return;
+  }
+
+  for (const chat of visibleChats) {
+    const row = document.createElement("div");
+    row.className = `history-row${chat.id === activeChatId ? " active" : ""}`;
+    const open = document.createElement("button");
+    open.className = "history-item";
+    open.type = "button";
+    open.textContent = chat.title;
+    open.title = chat.title;
+    open.addEventListener("click", () => {
+      if (isGenerating) return;
+      activeChatId = chat.id;
+      modelSelect.value = chat.model || config.models[0]?.id;
+      renderHistory();
+      renderChat();
+      document.querySelector(".sidebar").classList.remove("open");
+    });
+    const remove = document.createElement("button");
+    remove.className = "history-delete";
+    remove.type = "button";
+    remove.textContent = "×";
+    remove.setAttribute("aria-label", `Delete ${chat.title}`);
+    remove.addEventListener("click", () => deleteChat(chat.id));
+    row.append(open, remove);
+    historyView.append(row);
+  }
+}
+
+function deleteChat(id) {
+  if (isGenerating && id === activeChatId) stopGeneration();
+  chats = chats.filter((chat) => chat.id !== id);
+  if (activeChatId === id) activeChatId = chats[0]?.id || null;
+  safeSave();
+  renderHistory();
+  renderChat();
+}
+
+function renderChat() {
+  conversationView.replaceChildren();
+  const chat = currentChat();
+  const hasMessages = Boolean(chat?.messages.length);
+  emptyState.hidden = hasMessages;
+  if (!chat) return;
+  for (const message of chat.messages) renderMessage(message.role, message.content);
+  conversationView.scrollTop = conversationView.scrollHeight;
+}
+
+function renderMessage(role, content, { pending = false, error = false } = {}) {
   const article = document.createElement("article");
-  article.className = `message ${role}`;
-  emptyState.hidden = true;
-  const avatar = role === "assistant" ? config.brandName.slice(0, 1).toUpperCase() : "You";
-  // Never interpolate configurable branding or user/provider text into HTML.
-  const avatarNode = document.createElement("div");
-  avatarNode.className = "avatar";
-  avatarNode.textContent = avatar;
+  article.className = `message ${role}${error ? " error" : ""}`;
+  const avatar = document.createElement("div");
+  avatar.className = "avatar";
+  avatar.textContent = role === "assistant" ? config.brandName.slice(0, 1).toUpperCase() : "You";
   const body = document.createElement("div");
   const label = document.createElement("p");
   label.className = "message-label";
   label.textContent = role === "assistant" ? config.brandName : "You";
-  const message = document.createElement("p");
-  message.textContent = content;
-  body.append(label, message);
-  article.append(avatarNode, body);
-  conversation.append(article);
+  const text = document.createElement("p");
+  text.className = "message-content";
+  text.textContent = content;
+  body.append(label, text);
+
+  if (role === "assistant" && !pending && !error) {
+    const actions = document.createElement("div");
+    actions.className = "message-actions";
+    const copy = document.createElement("button");
+    copy.type = "button";
+    copy.className = "message-action";
+    copy.textContent = "Copy";
+    copy.addEventListener("click", async () => {
+      try {
+        await navigator.clipboard.writeText(content);
+        copy.textContent = "Copied";
+        setTimeout(() => { copy.textContent = "Copy"; }, 1200);
+      } catch { showNotice("Clipboard access is unavailable in this browser."); }
+    });
+    actions.append(copy);
+    body.append(actions);
+  }
+
+  article.append(avatar, body);
+  conversationView.append(article);
   article.scrollIntoView({ behavior: "smooth", block: "end" });
-  return article;
+  return { article, text };
 }
 
-function createHistoryItem(content) {
-  const item = document.createElement("button");
-  item.className = "history-item";
-  item.textContent = content.slice(0, 36);
-  history.append(item);
+function setGenerating(value) {
+  isGenerating = value;
+  sendButton.disabled = value;
+  stopButton.hidden = !value;
+  promptInput.disabled = value;
+  modelSelect.disabled = value;
 }
 
-function saveConversation() { localStorage.setItem(storageKey, JSON.stringify(messages)); }
+function stopGeneration() {
+  if (controller) controller.abort();
+}
 
-function loadConversation() {
+async function sendMessage(content) {
+  const chat = currentChat();
+  if (!chat || isGenerating || !content.trim()) return;
+  chat.model = modelSelect.value;
+  chat.messages.push({ role: "user", content: content.trim() });
+  chat.title = titleFrom(chat.messages);
+  chat.updatedAt = Date.now();
+  safeSave();
+  renderHistory();
+  renderMessage("user", content.trim());
+  const pending = renderMessage("assistant", "Thinking…", { pending: true });
+  promptInput.value = "";
+  promptInput.style.height = "auto";
+  controller = new AbortController();
+  setGenerating(true);
+
   try {
-    const stored = JSON.parse(localStorage.getItem(storageKey) || "[]");
-    if (!Array.isArray(stored)) return;
-    stored.forEach((message) => { if (["user", "assistant"].includes(message.role) && typeof message.content === "string") { messages.push(message); addMessage(message.role, message.content); } });
-    if (messages[0]?.role === "user") createHistoryItem(messages[0].content);
-  } catch { localStorage.removeItem(storageKey); }
+    const response = await fetch(apiUrl("/api/chat"), {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      signal: controller.signal,
+      body: JSON.stringify({ messages: chat.messages.slice(-MAX_LOCAL_MESSAGES), model: chat.model })
+    });
+    const result = await response.json().catch(() => ({}));
+    if (!response.ok) throw new Error(result.error || `Audora request failed (${response.status}).`);
+    if (typeof result.message !== "string" || !result.message.trim()) throw new Error("The model returned an empty response.");
+    pending.text.textContent = result.message;
+    const assistantMessage = { role: "assistant", content: result.message };
+    chat.messages.push(assistantMessage);
+    chat.updatedAt = Date.now();
+    safeSave();
+    // Replace the pending row so the copy action is available.
+    pending.article.remove();
+    renderMessage("assistant", result.message);
+  } catch (error) {
+    const message = error.name === "AbortError" ? "Generation stopped." : error.message;
+    pending.text.textContent = message;
+    pending.article.classList.add("error");
+  } finally {
+    controller = null;
+    setGenerating(false);
+    promptInput.focus();
+  }
 }
 
 async function loadConfig() {
   const response = await fetch(apiUrl("/api/config"));
   if (!response.ok) throw new Error(`The Audora API returned ${response.status}.`);
-  config = await response.json();
+  const data = await response.json();
+  config = { ...config, ...data, models: Array.isArray(data.models) && data.models.length ? data.models : config.models };
   document.documentElement.style.setProperty("--accent", config.accentColor);
   document.title = `${config.brandName} — AI workspace`;
   document.querySelectorAll("[data-brand]").forEach((node) => { node.textContent = config.brandName; });
   document.querySelectorAll("[data-tagline]").forEach((node) => { node.textContent = config.tagline; });
   document.querySelector("[data-brand-initial]").textContent = config.brandName.slice(0, 1).toUpperCase();
   document.querySelector("#welcome-heading").textContent = config.welcomeMessage;
-  prompt.placeholder = `Message ${config.brandName}`;
+  promptInput.placeholder = `Message ${config.brandName}`;
   modelSelect.replaceChildren(...config.models.map((model) => new Option(model.label, model.id)));
-  loadConversation();
+
+  try { chats = normalizeChats(JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]")); }
+  catch { chats = []; }
+  activeChatId = chats[0]?.id || null;
+  renderHistory();
+  renderChat();
 }
 
-form.addEventListener("submit", async (event) => {
+form.addEventListener("submit", (event) => {
   event.preventDefault();
-  const content = prompt.value.trim();
-  if (!content) return;
-  messages.push({ role: "user", content });
-  saveConversation();
-  addMessage("user", content);
-  if (messages.length === 1) createHistoryItem(content);
-  prompt.value = "";
-  const pending = addMessage("assistant", "Thinking…");
-  const button = form.querySelector("button");
-  button.disabled = true;
+  const content = promptInput.value.trim();
+  if (!content || isGenerating) return;
+  if (!currentChat()) makeChat();
+  sendMessage(content);
+});
 
-  try {
-    const result = await fetch(apiUrl("/api/chat"), {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, model: modelSelect.value })
-    });
-    const body = await result.json();
-    if (!result.ok) throw new Error(body.error || "Audora could not respond.");
-    pending.querySelector("div:last-child p:last-child").textContent = body.message;
-    messages.push({ role: "assistant", content: body.message });
-    saveConversation();
-  } catch (error) {
-    pending.querySelector("div:last-child p:last-child").textContent = error.message;
-    pending.classList.add("error");
-  } finally {
-    button.disabled = false;
-    prompt.focus();
+document.querySelector("#new-chat").addEventListener("click", () => {
+  if (isGenerating) return;
+  makeChat();
+  document.querySelector(".sidebar").classList.remove("open");
+});
+document.querySelector("#theme-toggle").addEventListener("click", () => {
+  document.documentElement.classList.toggle("light");
+  localStorage.setItem(THEME_KEY, document.documentElement.classList.contains("light") ? "light" : "dark");
+});
+document.querySelector("#open-sidebar").addEventListener("click", () => document.querySelector(".sidebar").classList.add("open"));
+document.querySelector("#close-sidebar").addEventListener("click", () => document.querySelector(".sidebar").classList.remove("open"));
+stopButton.addEventListener("click", stopGeneration);
+historySearch?.addEventListener("input", renderHistory);
+
+document.querySelectorAll(".suggestions button").forEach((button) => button.addEventListener("click", () => {
+  promptInput.value = button.textContent;
+  promptInput.focus();
+}));
+promptInput.addEventListener("input", () => {
+  promptInput.style.height = "auto";
+  promptInput.style.height = `${Math.min(promptInput.scrollHeight, 180)}px`;
+});
+promptInput.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" && !event.shiftKey && !event.isComposing) {
+    event.preventDefault();
+    form.requestSubmit();
   }
 });
 
-document.querySelectorAll(".suggestions button").forEach((button) => button.addEventListener("click", () => { prompt.value = button.textContent; prompt.focus(); }));
-document.querySelector("#new-chat").addEventListener("click", () => { messages.length = 0; localStorage.removeItem(storageKey); conversation.replaceChildren(); emptyState.hidden = false; prompt.focus(); });
-document.querySelector("#theme-toggle").addEventListener("click", () => document.documentElement.classList.toggle("light"));
-document.querySelector("#open-sidebar").addEventListener("click", () => document.querySelector(".sidebar").classList.add("open"));
-document.querySelector("#close-sidebar").addEventListener("click", () => document.querySelector(".sidebar").classList.remove("open"));
-loadConfig().catch((error) => addMessage("assistant", `Connection problem: ${error.message} Configure runtime-config.js with the URL of your Audora API, or host the UI and API together.`));
-
-prompt.addEventListener("input", () => {
-  prompt.style.height = "auto";
-  prompt.style.height = `${Math.min(prompt.scrollHeight, 180)}px`;
-});
+if (localStorage.getItem(THEME_KEY) === "light") document.documentElement.classList.add("light");
+loadConfig().catch((error) => showNotice(`Connection problem: ${error.message} Configure runtime-config.js with the URL of your Audora API, or host the UI and API together.`));
