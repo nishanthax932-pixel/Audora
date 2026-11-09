@@ -3,8 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <meta name="description" content="An AI workspace with configurable model providers. Review provider privacy settings before sharing sensitive information." />
-    <title>AI workspace</title>
+    <meta name="theme-color" content="#171717" />
+    <meta name="description" content="Audora is an AI workspace for conversation, research, writing, coding, and creation." />
+    <meta property="og:type" content="website" />
+    <meta property="og:title" content="Audora — Your intelligent workspace" />
+    <meta property="og:description" content="Think, create, research, and build with Audora." />
+    <title>Audora — Your intelligent workspace</title>
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet" />
@@ -13,13 +18,13 @@
   <body>
     <div class="app-shell">
       <aside class="sidebar">
-        <div class="sidebar-top"><a class="brand" href="/" aria-label="Home"><span class="orb"></span><span data-brand>Audora</span></a><button class="icon-button mobile-only" id="close-sidebar" aria-label="Close menu">×</button></div>
+        <div class="sidebar-top"><a class="brand" href="/" aria-label="Audora home"><span class="orb"></span><span data-brand>Audora</span></a><button class="icon-button mobile-only" id="close-sidebar" aria-label="Close menu">×</button></div>
         <button class="new-chat" id="new-chat"><span>＋</span> New chat</button>
         <label class="sr-only" for="history-search">Search conversations</label>
         <input id="history-search" class="history-search" type="search" placeholder="Search chats" autocomplete="off" />
         <button id="export-chats" class="export-chats" type="button">↓ Export conversations</button>
         <nav id="history" aria-label="Chat history"></nav>
-        <div class="sidebar-footer"><button class="workspace"><span class="workspace-mark" data-brand-initial>A</span><span><b data-brand>Audora</b><small data-tagline>Your intelligent workspace</small></span><span>···</span></button></div>
+        <div class="sidebar-footer"><button class="workspace" id="profile-workspace" type="button"><span class="workspace-mark" data-brand-initial>A</span><span><b data-brand>Audora</b><small data-tagline>Your intelligent workspace</small></span><span>···</span></button></div>
       </aside>
       <main class="workspace-main">
         <header class="topbar"><button class="icon-button mobile-only" id="open-sidebar" aria-label="Open menu">☰</button><div class="model-menu"><select id="model-select" aria-label="Choose model"></select><span>⌄</span></div><div id="engine-status" class="engine-status" role="status" aria-live="polite">Checking AI engine…</div><div class="topbar-actions"><button class="icon-button" id="theme-toggle" aria-label="Toggle theme">◐</button><button class="profile" id="profile-button" type="button" aria-label="Open Audora profile">N</button></div></header>
