@@ -11,7 +11,7 @@ async function withServer(environment, callback) {
 test("publishes safe white-label configuration", async () => {
   await withServer({ AUDORA_BRAND_NAME: "Northstar", AUDORA_ACCENT_COLOR: "#e85d75", AUDORA_MODELS: '[{"id":"provider-model","label":"Research"}]' }, async (url) => {
     const response = await fetch(`${url}/api/config`);
-    assert.deepEqual(await response.json(), { brandName: "Northstar", tagline: "Your intelligent workspace", accentColor: "#e85d75", welcomeMessage: "How can I help you today?", models: [{ id: "provider-model", label: "Research" }] });
+    assert.deepEqual(await response.json(), { brandName: "Northstar", tagline: "Your intelligent workspace", accentColor: "#e85d75", welcomeMessage: "How can I help you today?", searchEnabled: false, models: [{ id: "provider-model", label: "Research" }] });
   });
 });
 
