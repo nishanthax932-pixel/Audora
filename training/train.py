@@ -15,8 +15,14 @@ def load_examples(path: Path, tokenizer, max_length: int):
                 continue
             record = json.loads(line)
             messages = record.get("messages")
-            if not isinstance(messages, list) or len(messages) < 2:
-                raise ValueError(f"Line {line_number}: expected a messages array")
+            if not isinstance(messages, list):
+                prompt, answer = record.get("prompt"), record.get("response")
+                if isinstance(prompt, str) and isinstance(answer, str):
+                    messages = [{"role": "user", "content": prompt}, {"role": "assistant", "content": answer}]
+                else:
+                    raise ValueError(f"Line {line_number}: expected messages or prompt/response fields")
+            if len(messages) < 2:
+                raise ValueError(f"Line {line_number}: expected at least two messages")
             for message in messages:
                 if message.get("role") not in {"system", "user", "assistant"} or not isinstance(message.get("content"), str):
                     raise ValueError(f"Line {line_number}: invalid message")
