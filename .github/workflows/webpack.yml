@@ -53,5 +53,5 @@ jobs:
           python-version: "3.11"
       - name: Validate training script syntax and example dataset
         run: |
-          python -m py_compile training/train_lora.py
+          python -m py_compile training/train_lora.py training/train.py
           python -c "import json; rows=[json.loads(x) for x in open('training/data/train.example.jsonl', encoding='utf-8') if x.strip()]; assert len(rows) >= 2 and all(isinstance(r.get('prompt'), str) and isinstance(r.get('response'), str) for r in rows)"
