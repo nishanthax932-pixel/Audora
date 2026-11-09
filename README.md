@@ -84,21 +84,6 @@ no account login, cross-device sync, or cloud chat database in this starter.
 Text/code attachments and safe Markdown rendering are supported. Web search and source-link citations are available when SearXNG is configured; live token streaming is supported by compatible and Ollama providers. Autonomous multi-step tool execution is not yet implemented.
 Image generation has a self-hosted UI/API path; it remains disabled until a local Diffusers checkpoint, CUDA GPU, and matching server secret are configured. See `image/README.md`.
 
-## Web search with source citations
-
-Audora can retrieve live search results through a SearXNG instance that you
-control. Install and run SearXNG, enable JSON output in its search settings, then set the server-only environment variable:
-
-```bash
-AUDORA_SEARCH_URL=http://127.0.0.1:8080/search
-```
-
-Restart Audora. The search button appears in the composer when the endpoint is configured. Search snippets are passed to the model as untrusted evidence; the model is instructed to cite source URLs and not follow instructions embedded in web pages. Search is optional and does not silently fall back to a third-party search provider. SearXNG's JSON API requires `format=json` to be enabled by the instance administrator.
-
-## Self-hosted image generation
-
-See `image/README.md` to install the local Diffusers service and provide an already-downloaded, properly licensed SDXL checkpoint. The Node API proxies only to the configured private image service. The model server loads from disk with `local_files_only=True`; it does not download weights or call Pollinations/other hosted image providers. A CUDA GPU and substantial VRAM are required. Do not expose the image service publicly.
-
 ## Everyday user guide
 
 See [the everyday user guide](docs/USER-GUIDE.md) for first-time setup status, everyday workspace tools, privacy, and troubleshooting.
@@ -107,9 +92,13 @@ See [the everyday user guide](docs/USER-GUIDE.md) for first-time setup status, e
 
 See [free hosting](docs/FREE-HOSTING.md) for a Render Free blueprint that hosts the Audora interface and API gateway with a public HTTPS URL. The model runtime, web search service, and image-generation engine remain separate services and must be configured independently. See [hosting options](docs/HOSTING-OPTIONS.md) for a practical PC + Cloudflare Tunnel setup and the Oracle Always Free CPU alternative.
 
+## Alternative: use your own PC
+
+See [alternative deployment](docs/ALTERNATIVE-HOSTING.md) to run Audora and a local Ollama model on your own computer and expose only the web app through a temporary Cloudflare Tunnel. Your PC and internet connection must remain online.
+
 ## Deployment and configuration doctor
 
-See [the deployment guide](docs/DEPLOYMENT.md) for the Docker Compose GPU stack, model setup, optional services, and production security notes. Copy `.env.compose.example` to `.env` when using Compose. Run `npm run doctor` to check local configuration and reveal remaining infrastructure gaps; this check does not claim that a model or GPU is online.
+See the [deployment guide](docs/DEPLOYMENT.md) for the Docker Compose GPU stack, model setup, optional services, and production security notes. Copy `.env.compose.example` to `.env` when using Compose. Run `npm run doctor` to check local configuration and reveal remaining infrastructure gaps; this check does not claim that a model or GPU is online.
 
 See the [release acceptance checklist](docs/RELEASE-CHECKLIST.md) before a public launch.
 
