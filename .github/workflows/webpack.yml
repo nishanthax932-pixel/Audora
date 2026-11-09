@@ -39,6 +39,8 @@ jobs:
         run: npm run build
       - name: Run tests
         run: npm test
+      - name: Check deployment configuration
+        run: npm run doctor
       - name: Build production container
         run: docker build --tag audora-ci .
 
