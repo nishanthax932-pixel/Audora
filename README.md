@@ -1,192 +1,101 @@
 # Audora
 
-**Audora** is an online, white-label AI workspace with a ChatGPT-inspired chat
-experience and provider-agnostic inference layer. It is a practical foundation
-for a custom model product—not a claim of artificial general intelligence.
+**Audora** is a self-hostable AI workspace intended to run open-weight models
+on infrastructure controlled by Audora. It does not silently send prompts to
+a third-party text-generation service. Image generation has been removed
+until an Audora-owned image model and inference stack exist.
 
-## Run locally
-
-```bash
-npm install
-npm start
-```
-
-Open `http://localhost:3000` and chat. Audora does not silently route prompts to an outside free model. Configure a
-local model server before chatting; the default endpoint is local vLLM.
-
-## Test
+## Run the workspace
 
 ```bash
 npm install
-npm test
-```
-
-Runs the server test suite (validation, rate limiting, provider behavior,
-error handling). No API key is needed - provider calls are simulated in tests.
-
-For your own provider, copy `.env.example` to `.env` and either point Audora at
-a local OpenAI-compatible inference server such as vLLM (`AUDORA_PROVIDER=compatible`,
-`AUDORA_API_URL`, `AUDORA_API_KEY`) or optionally run Ollama. Keep credentials
-in environment variables and never in browser code.
-
-## Chat history and privacy
-
-Chat history is stored in the current browser's local storage on that device.
-It is not synced between devices and there is no account login or cloud chat
-database in this starter version. Use **Export conversations** in the sidebar
-to save a JSON backup. Clearing browser site data can remove local history.
-The UI keeps a bounded number of recent chats and supports searching and
-deleting individual conversations.
-
-The selected inference provider receives the message context sent by the
-server. In the default free mode, prompts are sent to the external free-tier
-provider; local Ollama mode sends prompts to the Ollama host. Do not send
-passwords, API keys, or sensitive personal information to an untrusted provider.
-
-## Deploy without 404 errors
-
-The browser UI and `/api/*` server must be deployed together, or the UI needs
-the URL of a separately deployed Audora API. A static-only host cannot run the
-chat server or Ollama and will return `404` for `/api/config` and `/api/chat`.
-
-### Deploy the full application together
-
-Deploy this repository to any host that runs Node applications, set its start
-command to `npm start`, and expose port `3000`. A container deployment can use:
-
-```bash
-docker build -t audora .
-docker run --env-file .env -p 3000:3000 audora
-```
-
-### Deploy the UI and API separately
-
-Deploy this Node application as the API, then edit `public/runtime-config.js`
-before deploying the `public` directory to a static host:
-
-```js
-window.AUDORA_RUNTIME_CONFIG = { apiBaseUrl: "https://your-audora-api.example" };
-```
-
-Set `AUDORA_ALLOWED_ORIGINS=https://your-static-site.example` on the API. The
-server permits only listed cross-origin browser requests; do not use `*`.
-
-## Configuration
-
-### Use Audora with no cloud API key
-
-Audora supports local Ollama inference. Install [Ollama](https://ollama.com),
-then run the following once before starting Audora:
-
-```bash
-ollama pull qwen3:8b
-ollama serve
+cp .env.example .env
 npm start
 ```
 
-Set `AUDORA_PROVIDER=ollama` in `.env` to use Ollama; the example file documents
-the optional setting. No cloud API key is needed in this mode. Your prompts
-stay on the machine running Ollama. This is still a
-real language model, but its quality and hardware requirements depend on the
-model you choose—it is not an AGI.
+The Node.js app expects a local OpenAI-compatible inference endpoint. The
+default is `http://127.0.0.1:8000/v1/chat/completions`. If no model server is
+running, chat reports a configuration error rather than falling back to an
+outside provider.
 
-### Use a hosted provider
+## Run an unquantized open-weight model
 
-Set `AUDORA_PROVIDER=compatible`, configure `AUDORA_API_URL` with a
-compatible chat-completions endpoint, set `AUDORA_API_KEY`, and choose a
-model through `AUDORA_MODEL`. Keep API keys only in environment variables—never
-in browser code.
-
-### White-labeling
-
-Set `AUDORA_BRAND_NAME`, `AUDORA_BRAND_TAGLINE`, `AUDORA_ACCENT_COLOR`, and
-`AUDORA_WELCOME_MESSAGE` to make the workspace your own. These safe branding
-values are delivered by `/api/config`; credentials remain server-only. Use
-`AUDORA_MODELS` to control models users can select. It is a JSON array, where
-each model has a user-facing `label` and a provider-facing `id`.
-
-## Production checklist
-
-Before a public launch, configure a real identity provider and a shared,
-durable rate limiter/database. The included rate limiter is per-process and
-only protects a single server instance. By default, forwarded IP headers are
-not trusted; set `AUDORA_TRUST_PROXY=1` only when exactly one trusted reverse
-proxy sits in front of Node. The free provider also has a shared upstream
-cooldown, so one visitor may temporarily delay other free-tier visitors.
-Set request/spend limits with your inference provider, use HTTPS, and add monitoring. This application is an AI
-workspace; it does not itself train or constitute an AGI model.
-
-## Fine-tune an Audora model
-
-Audora includes a reproducible supervised fine-tuning starter under `training/`.
-It uses an openly available pretrained model plus LoRA adapters (PEFT). The
-base checkpoint is not quantized by this starter: choose a model that fits the
-GPU memory available. LoRA trains a small set of adapter weights while leaving
-the original model weights frozen; it does not create a frontier model from
-scratch.
-
-1. Choose an open-weight base model whose license permits your intended use.
-2. Prepare reviewed, consented examples in JSONL format using
-   `training/data/train.example.jsonl` as the schema.
-3. Create a Python environment and install `training/requirements.txt`.
-4. Set `AUDORA_BASE_MODEL` and `AUDORA_TRAIN_FILE`, then run
-   `python training/train_lora.py`.
-5. Evaluate the adapter on held-out examples before deploying it.
-
-The starter defaults to `Qwen/Qwen2.5-1.5B-Instruct` as a modest example, not
-as a claim that it is the best model. Training requires a compatible GPU and
-enough VRAM for the full-precision/base-precision checkpoint you select.
-No model weights or training run are included in this repository. Do not
-upload private user conversations, secrets, or personal data as training
-examples without explicit permission.
-
-To serve the trained model locally, merge/load the adapter in a compatible
-Transformers runtime or export it to a supported inference format, then point
-Audora at a local OpenAI-compatible inference server. The existing Ollama
-provider remains available for local inference; a LoRA adapter must first be
-converted/merged to a format supported by your chosen Ollama workflow.
-
-## Image generation
-
-Image generation has been removed. Audora does not call Pollinations or another
-third-party image-generation API, and the composer no longer offers image mode.
-An in-house image model is a separate project: it would require selecting an
-open-weight diffusion model, checking its license, fine-tuning it on permitted
-images, and providing GPU inference capacity. Until that exists, image
-generation is intentionally unavailable.
-
-The chat model currently returns normal text completions. Web search and
-multi-step function/tool calling are not yet wired into the request lifecycle.
-For reasoning questions, ask for a concise explanation or visible solution
-steps; the app does not expose private internal chain-of-thought.
-
-
-## Open-weight Audora model and fine-tuning
-
-The default provider is a local OpenAI-compatible inference server. For
-unquantized model weights, use a BF16/FP16 safetensors checkpoint with vLLM;
-do not select GGUF, AWQ, GPTQ, or 4-bit/8-bit quantized downloads. Example:
+Install CUDA-compatible PyTorch and vLLM, download an open-weight checkpoint
+whose license permits your intended use, then launch it. Example:
 
 ```bash
-vllm serve ./models/audora-checkpoint --served-model-name audora-local --dtype bfloat16 --api-key local-audora-key
+vllm serve ./models/audora-checkpoint \
+  --served-model-name audora-local \
+  --dtype bfloat16 \
+  --api-key local-audora-key
 ```
 
-A full fine-tuning starter is in `training/train.py`. It loads original
-weights directly in BF16/FP16 (no quantized loading or LoRA) and trains on
-permissioned JSONL conversations:
+Use BF16/FP16 safetensors if you specifically want non-quantized weights.
+Avoid GGUF, AWQ, GPTQ, and 4-bit/8-bit quantized variants. BF16/FP16 are
+floating-point formats (not quantized weights), although they are not FP32.
+Set the same local API key and model name in `.env`. Keep inference private
+and authenticated; do not expose an unauthenticated model endpoint publicly.
+
+## Fine-tune Audora
+
+Two starter paths are included:
+
+- `training/train.py`: full fine-tuning with the original model loaded in
+  BF16/FP16; no quantized loading and no LoRA adapters.
+- `training/train_lora.py`: a lower-memory LoRA/PEFT option that trains
+  adapter weights while leaving the base model frozen.
+
+Full fine-tuning requires substantially more GPU memory because weights,
+gradients, optimizer states, and activations all consume memory. LoRA is more
+practical on smaller GPUs, but it does not change the base weights. Neither
+method is training a foundation model from scratch.
+
+For full fine-tuning, prepare a reviewed, permissioned JSONL dataset and run:
 
 ```bash
 pip install -r training/requirements.txt
 python training/train.py --model Qwen/Qwen2.5-0.5B-Instruct --data data/audora_train.jsonl --output models/audora-checkpoint
 ```
 
-Install a CUDA-compatible PyTorch build first. Full fine-tuning needs a
-substantial GPU and memory for weights, gradients, optimizer states, and
-activations; GitHub stores code but does not provide the training GPU or model
-storage. Start with a small model, verify its license, use data you have
-permission to train on, and maintain a held-out evaluation set. Fine-tuning
-is not equivalent to training a frontier model from scratch.
+For the LoRA path, follow the instructions in `training/train_lora.py` and
+the example dataset under `training/data/`. Install a CUDA-compatible
+PyTorch build first. GitHub stores source code and configuration; it does not
+provide the GPU compute or storage needed to train a model. Check model and
+dataset licenses, use only data you have permission to train on, remove
+personal information, deduplicate examples, and keep a held-out evaluation
+set. Fine-tuning does not automatically make every answer more accurate.
 
-Audora provides user-facing explanations, assumptions, key steps, and
-verifiable conclusions; it does not expose private internal chain-of-thought.
-Image generation remains removed until an Audora-owned image model exists.
+After training, serve the resulting full checkpoint or merged adapter with
+vLLM and configure `AUDORA_API_URL`, `AUDORA_API_KEY`, and `AUDORA_MODEL`
+in the server environment. Never commit real credentials or model secrets.
+
+## Reasoning and answer quality
+
+Audora is instructed to provide useful explanations, assumptions, key steps,
+checks, and verifiable conclusions. It does not expose private internal
+chain-of-thought. Test the final answers for correctness, factuality, and
+consistency instead of exposing hidden scratchpad reasoning.
+
+## Existing workspace capabilities
+
+Chat history and profile memory are stored in browser local storage. There is
+no account login, cross-device sync, or cloud chat database in this starter.
+Text/code attachments and safe Markdown rendering are supported. Web search,
+citations, streaming, and multi-step tool execution are not yet implemented.
+Image generation is intentionally unavailable.
+
+## Tests and production
+
+```bash
+npm test
+npm run build
+```
+
+Tests mock the local inference server; they verify request construction and
+error handling, not model quality or GPU availability. A real end-to-end check
+requires the actual checkpoint and inference server.
+
+Before public launch, configure identity, durable rate limiting, monitoring,
+HTTPS, access controls, backups, and infrastructure capacity. The built-in
+rate limiter is per-process. Chat history is local to the current browser;
+the inference server receives the context submitted for each request.
