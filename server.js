@@ -34,6 +34,8 @@ function getSettings(environment = process.env) {
     models: models.length ? models : [{ id: fallbackModel, label: "Audora Core" }],
     provider,
     apiKey: environment.AUDORA_API_KEY,
+    imageApiUrl: environment.AUDORA_IMAGE_API_URL || "http://127.0.0.1:8001/generate",
+    imageApiKey: environment.AUDORA_IMAGE_API_KEY || "",
     apiUrl: provider === "ollama"
       ? (environment.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat")
       : (environment.AUDORA_API_URL || "http://127.0.0.1:8000/v1/chat/completions"),
@@ -107,8 +109,32 @@ export function createApp(environment = process.env) {
   });
   app.use(express.static(path.join(dirname, "public")));
 
-  app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, models: settings.models.map(({ id, label }) => ({ id, label })) }));
+  app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, models: settings.models.map(({ id, label }) => ({ id, label })), imageGenerationEnabled: Boolean(settings.imageApiKey) }));
   app.get("/api/health", (_request, response) => response.json({ name: settings.brandName, status: "ready", provider: settings.provider, providerConfigured: settings.provider !== "compatible" || Boolean(settings.apiKey), models: settings.models.length }));
+
+
+
+  // Image generation is delegated only to an Audora-controlled, self-hosted
+  // Diffusers service. No public/third-party image provider is used.
+  app.post("/api/image", createRateLimiter({ ...settings, rateLimitMax: 5 }), async (request, response) => {
+    const prompt = typeof request.body?.prompt === "string" ? request.body.prompt.trim() : "";
+    if (prompt.length < 4 || prompt.length > 1000) return response.status(400).json({ error: "Image prompt must contain 4–1000 characters." });
+    if (!settings.imageApiKey) return response.status(503).json({ error: "Audora's self-hosted image model is not configured yet." });
+    const aborter = new AbortController();
+    const timer = setTimeout(() => aborter.abort(), 120000);
+    response.on("close", () => { if (!response.writableEnded) aborter.abort(); });
+    try {
+      const upstream = await fetch(settings.imageApiUrl, { method: "POST", signal: aborter.signal, headers: { "Content-Type": "application/json", Authorization: `Bearer ${settings.imageApiKey}` }, body: JSON.stringify({ prompt }) });
+      const payload = await upstream.json().catch(() => ({}));
+      if (!upstream.ok || typeof payload.image !== "string" || !/^[A-Za-z0-9+/]+={0,2}$/.test(payload.image) || payload.image.length > 11_200_000) {
+        console.error("Audora self-hosted image service failed", { status: upstream.status });
+        return response.status(upstream.ok ? 502 : 503).json({ error: "The self-hosted image model could not complete this request." });
+      }
+      return response.json({ image: `data:image/png;base64,${payload.image}` });
+    } catch (error) {
+      return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "Image generation timed out." : "Audora could not reach its self-hosted image model." });
+    } finally { clearTimeout(timer); }
+  });
 
   app.post("/api/chat", createRateLimiter(settings), async (request, response) => {
     const { messages, model: requestedModel, memory, reasoning } = request.body || {};
