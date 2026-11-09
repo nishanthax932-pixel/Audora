@@ -86,7 +86,8 @@ Image generation has a self-hosted UI/API path; it remains disabled until a loca
 
 ## Web search with source citations
 
-Audora can retrieve live search results through a SearXNG instance that you control. Install and run SearXNG, enable JSON output in its search settings, then set the server-only environment variable:
+Audora can retrieve live search results through a SearXNG instance that you
+control. Install and run SearXNG, enable JSON output in its search settings, then set the server-only environment variable:
 
 ```bash
 AUDORA_SEARCH_URL=http://127.0.0.1:8080/search
@@ -113,3 +114,8 @@ Before public launch, configure identity, durable rate limiting, monitoring,
 HTTPS, access controls, backups, and infrastructure capacity. The built-in
 rate limiter is per-process. Chat history is local to the current browser;
 the inference server receives the context submitted for each request.
+
+## Audora Wiki
+
+Project documentation, setup instructions, architecture notes, known limitations, and deployment guidance:
+[Open the Audora Wiki](docs/AUDORA-WIKI.md).
