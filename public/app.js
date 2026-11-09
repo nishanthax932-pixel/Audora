@@ -15,7 +15,9 @@ const profileMemory = document.querySelector("#profile-memory");
 const PROFILE_KEY = "audora-profile-v1";
 const fileInput = document.querySelector("#file-input");
 const thinkingModeButton = document.querySelector("#thinking-mode");
+const searchModeButton = document.querySelector("#search-mode");
 let thinkingMode = false;
+let searchMode = false;
 const attachmentList = document.querySelector("#attachment-list");
 let attachments = [];
 let profile = { name: "", email: "" };
@@ -32,7 +34,8 @@ let config = {
   tagline: "Your intelligent workspace",
   accentColor: "#805ad5",
   welcomeMessage: "How can I help you today?",
-  models: [{ id: "openai", label: "Audora Core" }]
+  models: [{ id: "openai", label: "Audora Core" }],
+  searchEnabled: false
 };
 let chats = [];
 let activeChatId = null;
@@ -175,14 +178,27 @@ function renderChat() {
 }
 
 function renderInline(parent, value) {
-  const pattern = /(`[^`]+`|\*\*[^*]+\*\*)/g;
+  const pattern = /(\[[^\]]+\]\(https?:\/\/[^)\s]+\)|`[^`]+`|\*\*[^*]+\*\*)/g;
   let cursor = 0;
   for (const match of value.matchAll(pattern)) {
     if (match.index > cursor) parent.append(document.createTextNode(value.slice(cursor, match.index)));
     const token = match[0];
-    const node = document.createElement(token.startsWith("`") ? "code" : "strong");
-    node.textContent = token.startsWith("`") ? token.slice(1, -1) : token.slice(2, -2);
-    parent.append(node);
+    if (token.startsWith("[")) {
+      const match = token.match(/^\[([^\]]+)\]\((https?:\/\/[^)\s]+)\)$/);
+      if (match) {
+        try {
+          const url = new URL(match[2]);
+          if (["http:", "https:"].includes(url.protocol)) {
+            const link = document.createElement("a"); link.href = url.href; link.textContent = match[1];
+            link.target = "_blank"; link.rel = "noopener noreferrer"; parent.append(link);
+          }
+        } catch { parent.append(document.createTextNode(match[1])); }
+      }
+    } else {
+      const node = document.createElement(token.startsWith("`") ? "code" : "strong");
+      node.textContent = token.startsWith("`") ? token.slice(1, -1) : token.slice(2, -2);
+      parent.append(node);
+    }
     cursor = match.index + token.length;
   }
   if (cursor < value.length) parent.append(document.createTextNode(value.slice(cursor)));
@@ -291,13 +307,23 @@ async function sendMessage(content) {
   setGenerating(true);
 
   try {
+    let searchContext = "";
+    if (searchMode) {
+      pending.text.textContent = "Searching the web…";
+      const searchResponse = await fetch(apiUrl(`/api/search?q=${encodeURIComponent(content.trim())}`), { signal: controller.signal });
+      const searchPayload = await searchResponse.json().catch(() => ({}));
+      if (!searchResponse.ok) throw new Error(searchPayload.error || "Web search failed.");
+      if (!Array.isArray(searchPayload.results) || !searchPayload.results.length) throw new Error("No web search results were found. Try a more specific query.");
+      searchContext = searchPayload.results.map((item, index) => `[Source ${index + 1}] ${item.title}\nURL: ${item.url}\nSnippet: ${item.content}`).join("\n\n");
+      pending.text.textContent = "Reading sources and preparing an answer…";
+    }
     const response = await fetch(apiUrl("/api/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       // The API accepts at most 40 context messages. Keep the longer local
       // transcript for history, but send only the newest supported context.
-      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode, stream: true })
+      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode, searchContext, stream: true })
     });
     if (!response.ok) {
       const failure = await response.json().catch(() => ({}));
@@ -360,6 +386,7 @@ async function loadConfig() {
   if (!response.ok) throw new Error(`The Audora API returned ${response.status}.`);
   const data = await response.json();
   config = { ...config, ...data, models: Array.isArray(data.models) && data.models.length ? data.models : config.models };
+  if (searchModeButton) searchModeButton.hidden = !config.searchEnabled;
   document.documentElement.style.setProperty("--accent", config.accentColor);
   document.title = `${config.brandName} — AI workspace`;
   document.querySelectorAll("[data-brand]").forEach((node) => { node.textContent = config.brandName; });
@@ -409,6 +436,13 @@ function renderAttachments() {
 }
 
 document.querySelector("#attach-files").addEventListener("click", () => fileInput.click());
+searchModeButton?.addEventListener("click", () => {
+  searchMode = !searchMode;
+  searchModeButton.setAttribute("aria-pressed", String(searchMode));
+  searchModeButton.classList.toggle("active", searchMode);
+  searchModeButton.title = searchMode ? "Web search is on for the next answer" : "Search the web before answering";
+  showNotice(searchMode ? "Web search enabled: Audora will retrieve live results and use source links." : "Web search disabled.");
+});
 thinkingModeButton.addEventListener("click", () => {
   thinkingMode = !thinkingMode;
   thinkingModeButton.setAttribute("aria-pressed", String(thinkingMode));
