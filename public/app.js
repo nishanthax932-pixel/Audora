@@ -15,8 +15,18 @@ function addMessage(role, content) {
   article.className = `message ${role}`;
   emptyState.hidden = true;
   const avatar = role === "assistant" ? config.brandName.slice(0, 1).toUpperCase() : "You";
-  article.innerHTML = `<div class="avatar">${avatar}</div><div><p class="message-label">${role === "assistant" ? config.brandName : "You"}</p><p></p></div>`;
-  article.querySelector("div:last-child p:last-child").textContent = content;
+  // Never interpolate configurable branding or user/provider text into HTML.
+  const avatarNode = document.createElement("div");
+  avatarNode.className = "avatar";
+  avatarNode.textContent = avatar;
+  const body = document.createElement("div");
+  const label = document.createElement("p");
+  label.className = "message-label";
+  label.textContent = role === "assistant" ? config.brandName : "You";
+  const message = document.createElement("p");
+  message.textContent = content;
+  body.append(label, message);
+  article.append(avatarNode, body);
   conversation.append(article);
   article.scrollIntoView({ behavior: "smooth", block: "end" });
   return article;
