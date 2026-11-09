@@ -11,6 +11,7 @@ const profileButton = document.querySelector("#profile-button");
 const profileDialog = document.querySelector("#profile-dialog");
 const profileName = document.querySelector("#profile-name");
 const profileEmail = document.querySelector("#profile-email");
+const profileMemory = document.querySelector("#profile-memory");
 const PROFILE_KEY = "audora-profile-v1";
 const fileInput = document.querySelector("#file-input");
 const attachmentList = document.querySelector("#attachment-list");
@@ -48,7 +49,7 @@ function safeSave() {
 }
 
 function saveProfile() {
-  profile = { name: profileName.value.trim().slice(0, 60), email: profileEmail.value.trim().slice(0, 120) };
+  profile = { name: profileName.value.trim().slice(0, 60), email: profileEmail.value.trim().slice(0, 120), memory: profileMemory.value.trim().slice(0, 1200) };
   try { localStorage.setItem(PROFILE_KEY, JSON.stringify(profile)); }
   catch { showNotice("Profile could not be saved in this browser."); }
   renderProfile();
@@ -65,6 +66,7 @@ function renderProfile() {
 function openProfile() {
   profileName.value = profile.name;
   profileEmail.value = profile.email;
+  profileMemory.value = profile.memory || "";
   renderProfile();
   profileDialog.showModal();
 }
@@ -292,7 +294,7 @@ async function sendMessage(content) {
       signal: controller.signal,
       // The API accepts at most 40 context messages. Keep the longer local
       // transcript for history, but send only the newest supported context.
-      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model })
+      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model, memory: profile.memory || "" })
     });
     const result = await response.json().catch(() => ({}));
     if (!response.ok) throw new Error(result.error || `Audora request failed (${response.status}).`);
@@ -432,7 +434,7 @@ promptInput.addEventListener("keydown", (event) => {
 try {
   if (localStorage.getItem(THEME_KEY) === "light") document.documentElement.classList.add("light");
   const savedProfile = JSON.parse(localStorage.getItem(PROFILE_KEY) || "null");
-  if (savedProfile && typeof savedProfile === "object") profile = { name: typeof savedProfile.name === "string" ? savedProfile.name.slice(0, 60) : "", email: typeof savedProfile.email === "string" ? savedProfile.email.slice(0, 120) : "" };
+  if (savedProfile && typeof savedProfile === "object") profile = { name: typeof savedProfile.name === "string" ? savedProfile.name.slice(0, 60) : "", email: typeof savedProfile.email === "string" ? savedProfile.email.slice(0, 120) : "", memory: typeof savedProfile.memory === "string" ? savedProfile.memory.slice(0, 1200) : "" };
 } catch { /* Private browsing may disable local storage. */ }
 profileButton.addEventListener("click", openProfile);
 document.querySelector("#profile-save").addEventListener("click", (event) => { event.preventDefault(); if (!profileEmail.validity.valid) { profileEmail.reportValidity(); return; } saveProfile(); });
