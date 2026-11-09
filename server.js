@@ -92,7 +92,8 @@ export function createApp(environment = process.env) {
   const app = express();
   const instructions = `You are ${settings.brandName}, a capable AI assistant. Be accurate, practical, clear, and direct. Do not reveal private chain-of-thought. State uncertainty plainly, ask a focused follow-up when it is needed, and maintain essential safety boundaries.`;
 
-  // Only trust forwarded client IP headers when deployment explicitly sits behind one trusted proxy.\n  app.set("trust proxy", environment.AUDORA_TRUST_PROXY === "1" ? 1 : false);
+  // Only trust forwarded client IP headers when deployment explicitly sits behind one trusted proxy.
+  app.set("trust proxy", environment.AUDORA_TRUST_PROXY === "1" ? 1 : false);
   app.use(express.json({ limit: "1mb" }));
   app.use((_request, response, next) => {
     response.set({ "X-Content-Type-Options": "nosniff", "X-Frame-Options": "DENY", "Referrer-Policy": "strict-origin-when-cross-origin", "Cache-Control": "no-store" });
