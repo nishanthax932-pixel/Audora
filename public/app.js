@@ -312,10 +312,10 @@ async function sendMessage(content) {
         const { value, done } = await reader.read();
         if (done) break;
         buffer += decoder.decode(value, { stream: true });
-        const events = buffer.split(/\\n\\n/);
+        const events = buffer.split(/\n\n/);
         buffer = events.pop() || "";
         for (const eventText of events) {
-          const dataLine = eventText.split(/\\r?\\n/).find((line) => line.startsWith("data:"));
+          const dataLine = eventText.split(/\r?\n/).find((line) => line.startsWith("data:"));
           if (!dataLine) continue;
           let event;
           try { event = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
