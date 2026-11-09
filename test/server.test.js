@@ -107,3 +107,48 @@ test("returns JSON rather than an HTML page for unknown API routes", async () =>
     assert.deepEqual(await response.json(), { error: "Audora API route not found." });
   });
 });
+
+
+test("rate limits each client independently", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://provider.invalid/")) {
+      return new Response(JSON.stringify({ choices: [{ message: { content: "OK" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "compatible", AUDORA_API_URL: "https://provider.invalid/chat", AUDORA_API_KEY: "test-only", AUDORA_RATE_LIMIT_MAX: "1" }, async (url) => {
+      const send = (ip) => originalFetch(`${url}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json", "X-Forwarded-For": ip }, body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] }) });
+      assert.equal((await send("198.51.100.10")).status, 200);
+      assert.equal((await send("198.51.100.10")).status, 429);
+      assert.equal((await send("198.51.100.11")).status, 200);
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("returns safe JSON for malformed request bodies", async () => {
+  await withServer({}, async (url) => {
+    const response = await fetch(`${url}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{" });
+    assert.equal(response.status, 400);
+    assert.deepEqual(await response.json(), { error: "Request body must contain valid JSON." });
+  });
+});
+
+test("does not expose raw hosted-provider error details", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://provider.invalid/")) {
+      return new Response(JSON.stringify({ error: { message: "secret account token and internal endpoint" } }), { status: 401, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "compatible", AUDORA_API_URL: "https://provider.invalid/chat", AUDORA_API_KEY: "test-only" }, async (url) => {
+      const response = await originalFetch(`${url}/api/chat`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ messages: [{ role: "user", content: "Hello" }] }) });
+      assert.equal(response.status, 401);
+      const body = await response.json();
+      assert.doesNotMatch(body.error, /secret account token|internal endpoint/);
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
