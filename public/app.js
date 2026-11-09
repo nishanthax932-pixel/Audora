@@ -147,13 +147,26 @@ function renderHistory() {
       renderChat();
       document.querySelector(".sidebar").classList.remove("open");
     });
+    const rename = document.createElement("button");
+    rename.className = "history-rename";
+    rename.type = "button";
+    rename.textContent = "···";
+    rename.title = "Rename conversation";
+    rename.setAttribute("aria-label", "Rename " + chat.title);
+    rename.addEventListener("click", () => {
+      const title = window.prompt("Rename conversation", chat.title);
+      if (title === null) return;
+      const clean = title.trim().slice(0, 80);
+      if (!clean) return;
+      chat.title = clean; chat.updatedAt = Date.now(); safeSave(); renderHistory();
+    });
     const remove = document.createElement("button");
     remove.className = "history-delete";
     remove.type = "button";
     remove.textContent = "×";
     remove.setAttribute("aria-label", `Delete ${chat.title}`);
     remove.addEventListener("click", () => deleteChat(chat.id));
-    row.append(open, remove);
+    row.append(open, rename, remove);
     historyView.append(row);
   }
 }
@@ -263,6 +276,21 @@ function renderMessage(role, content, { pending = false, error = false } = {}) {
       } catch { showNotice("Clipboard access is unavailable in this browser."); }
     });
     actions.append(copy);
+    const regenerate = document.createElement("button");
+    regenerate.type = "button";
+    regenerate.className = "message-action";
+    regenerate.textContent = "Regenerate";
+    regenerate.addEventListener("click", () => {
+      const chat = currentChat();
+      if (!chat || isGenerating || chat.messages.at(-1)?.role !== "assistant") return;
+      chat.messages.pop();
+      const lastUser = [...chat.messages].reverse().find((item) => item.role === "user");
+      if (!lastUser) return;
+      safeSave();
+      renderChat();
+      sendMessage(lastUser.content, { appendUser: false });
+    });
+    actions.append(regenerate);
     body.append(actions);
   }
 
@@ -285,13 +313,13 @@ function stopGeneration() {
   if (controller) controller.abort();
 }
 
-async function sendMessage(content) {
+async function sendMessage(content, { appendUser = true } = {}) {
   const chat = currentChat();
   if (!chat || isGenerating || !content.trim()) return;
   chat.model = modelSelect.value;
   const fileContext = attachments.map((file) => `\n\n[Attached file: ${file.name}]\n${file.content}`).join("");
   const fullContent = `${content.trim()}${fileContext}`.slice(0, 12000);
-  chat.messages.push({ role: "user", content: fullContent });
+  if (appendUser) chat.messages.push({ role: "user", content: fullContent });
   attachments = [];
   renderAttachments();
   chat.title = titleFrom(chat.messages);
@@ -299,7 +327,7 @@ async function sendMessage(content) {
   chats = [chat, ...chats.filter((item) => item.id !== chat.id)].slice(0, MAX_LOCAL_CHATS);
   safeSave();
   renderHistory();
-  renderMessage("user", fullContent);
+  if (appendUser) renderMessage("user", fullContent);
   const pending = renderMessage("assistant", "Thinking…", { pending: true });
   promptInput.value = "";
   promptInput.style.height = "auto";
@@ -463,6 +491,56 @@ function renderAttachments() {
 }
 
 document.querySelector("#attach-files").addEventListener("click", () => fileInput.click());
+
+document.querySelector("#voice-input")?.addEventListener("click", () => {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    showNotice("Voice typing is not supported in this browser. Try Chrome on Android or use your keyboard microphone.");
+    return;
+  }
+  const recognition = new SpeechRecognition();
+  recognition.lang = navigator.language || "en-IN";
+  recognition.interimResults = true;
+  recognition.continuous = false;
+  const voiceButton = document.querySelector("#voice-input");
+  voiceButton.classList.add("recording");
+  voiceButton.setAttribute("aria-pressed", "true");
+  recognition.onresult = (event) => {
+    const transcript = Array.from(event.results).map((result) => result[0]?.transcript || "").join("");
+    promptInput.value = transcript;
+    promptInput.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+  recognition.onerror = () => showNotice("Microphone input stopped. Check browser microphone permission.");
+  recognition.onend = () => {
+    voiceButton.classList.remove("recording");
+    voiceButton.setAttribute("aria-pressed", "false");
+    promptInput.focus();
+  };
+  try { recognition.start(); showNotice("Listening… speak your message."); }
+  catch { voiceButton.classList.remove("recording"); showNotice("Could not start voice input. Try again."); }
+});
+
+document.querySelector("#share-chat")?.addEventListener("click", async () => {
+  const chat = currentChat();
+  if (!chat?.messages.length) return showNotice("Start a conversation before sharing it.");
+  const payload = JSON.stringify({ format: "audora-conversation-v1", title: chat.title, messages: chat.messages });
+  const blob = new Blob([payload], { type: "application/json" });
+  const file = new File([blob], "audora-conversation.json", { type: "application/json" });
+  try {
+    if (navigator.canShare?.({ files: [file] })) await navigator.share({ title: chat.title, text: "Audora conversation", files: [file] });
+    else {
+      await navigator.clipboard.writeText(payload);
+      showNotice("Conversation data copied as JSON. You can paste or save it to share.");
+    }
+  } catch (error) {
+    if (error.name !== "AbortError") showNotice("Sharing was unavailable. Use Export conversations from the sidebar.");
+  }
+});
+
+document.querySelector("#explore-assistants")?.addEventListener("click", () => {
+  document.querySelector("#manage-assistants")?.click();
+  document.querySelector(".sidebar").classList.remove("open");
+});
 searchModeButton?.addEventListener("click", () => {
   searchMode = !searchMode;
   searchModeButton.setAttribute("aria-pressed", String(searchMode));
