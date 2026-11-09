@@ -27,13 +27,13 @@ whose license permits your intended use, then launch it. Example:
 vllm serve ./models/audora-checkpoint \
   --served-model-name audora-local \
   --dtype bfloat16 \
-  --api-key local-audora-key
+  --api-key replace-with-a-long-random-secret
 ```
 
 Use BF16/FP16 safetensors if you specifically want non-quantized weights.
 Avoid GGUF, AWQ, GPTQ, and 4-bit/8-bit quantized variants. BF16/FP16 are
 floating-point formats (not quantized weights), although they are not FP32.
-Set the same local API key and model name in `.env`. Keep inference private
+Set the same strong random API key (at least 32 characters) and model name in `.env`. Keep inference private
 and authenticated; do not expose an unauthenticated model endpoint publicly.
 
 ## Fine-tune Audora
@@ -45,7 +45,7 @@ Two starter paths are included:
 - `training/train_lora.py`: lower-memory LoRA/PEFT option that trains
   adapter weights while leaving the base model frozen.
 
-Full fine-tuning requires substantially more GPU memory because weights,
+Both training scripts mask user/system prompt tokens from the loss and train on assistant response tokens only. Full fine-tuning requires substantially more GPU memory because weights,
 gradients, optimizer states, and activations all consume memory. LoRA is more
 practical on smaller GPUs, but it does not change the base weights. Neither
 method is training a foundation model from scratch.
