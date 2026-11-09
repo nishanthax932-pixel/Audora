@@ -227,3 +227,41 @@ test("proxies image generation only to the configured self-hosted engine", { con
     });
   } finally { globalThis.fetch = originalFetch; }
 });
+
+
+test("streams compatible-provider tokens as server-sent events", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === "https://provider.invalid/stream") {
+      assert.equal(JSON.parse(options.body).stream, true);
+      return new Response('data: {"choices":[{"delta":{"content":"Hello "}}]}\\n\\ndata: {"choices":[{"delta":{"content":"Audora"}}]}\\n\\ndata: [DONE]\\n\\n', {
+        status: 200,
+        headers: { "Content-Type": "text/event-stream" }
+      });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({
+      AUDORA_PROVIDER: "compatible",
+      AUDORA_API_URL: "https://provider.invalid/stream",
+      AUDORA_API_KEY: "test-only"
+    }, async (url) => {
+      const response = await originalFetch(`${url}/api/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "Say hello" }], stream: true })
+      });
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get("content-type"), /text\\/event-stream/);
+      const body = await response.text();
+      assert.match(body, /event: delta/);
+      assert.match(body, /Hello /);
+      assert.match(body, /Audora/);
+      assert.match(body, /event: done/);
+      assert.match(body, /"message":"Hello Audora"/);
+    });
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
+});
