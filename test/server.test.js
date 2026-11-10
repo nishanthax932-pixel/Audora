@@ -405,3 +405,14 @@ test("converts validated image data URLs to Ollama image payloads", { concurrenc
     });
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test("health reports the real limits of browser document, image, and voice features", async () => {
+  await withServer({}, async (url) => {
+    const health = await (await fetch(`${url}/api/health`)).json();
+    assert.equal(health.documentParsing, "browser-local-pdf-docx");
+    assert.equal(health.imageUnderstanding, "vision-model-required");
+    assert.equal(health.voiceMode, "browser-speech-to-text");
+    assert.equal(health.accountsEnabled, false);
+    assert.equal(health.liveInferenceVerified, false);
+  });
+});
