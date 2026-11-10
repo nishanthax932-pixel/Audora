@@ -20,6 +20,7 @@ let thinkingMode = false;
 let searchMode = false;
 const attachmentList = document.querySelector("#attachment-list");
 let attachments = [];
+let imageAttachments = [];
 let profile = { name: "", email: "" };
 
 const STORAGE_KEY = "audora-workspace-v2";
@@ -318,9 +319,12 @@ async function sendMessage(content, { appendUser = true } = {}) {
   if (!chat || isGenerating || !content.trim()) return;
   chat.model = modelSelect.value;
   const fileContext = attachments.map((file) => `\n\n[Attached file: ${file.name}]\n${file.content}`).join("");
-  const fullContent = `${content.trim()}${fileContext}`.slice(0, 12000);
+  const imageContext = imageAttachments.map((file) => `\n[Attached image: ${file.name}]`).join("");
+  const fullContent = `${content.trim()}${fileContext}${imageContext}`.slice(0, 12000);
+  const imagesForRequest = imageAttachments.slice();
   if (appendUser) chat.messages.push({ role: "user", content: fullContent });
   attachments = [];
+  imageAttachments = [];
   renderAttachments();
   chat.title = titleFrom(chat.messages);
   chat.updatedAt = Date.now();
@@ -351,7 +355,7 @@ async function sendMessage(content, { appendUser = true } = {}) {
       signal: controller.signal,
       // The API accepts at most 40 context messages. Keep the longer local
       // transcript for history, but send only the newest supported context.
-      body: JSON.stringify({ messages: chat.messages.slice(-40), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode, searchContext, stream: true })
+      body: JSON.stringify({ messages: (() => { const context = chat.messages.slice(-40).map((message) => ({ ...message })); const lastUser = [...context].reverse().find((message) => message.role === "user"); if (lastUser && imagesForRequest.length) lastUser.content = [{ type: "text", text: lastUser.content }, ...imagesForRequest.map((file) => ({ type: "image_url", image_url: { url: file.data } }))]; return context; })(), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode, searchContext, stream: true })
     });
     if (!response.ok) {
       const failure = await response.json().catch(() => ({}));
@@ -488,6 +492,12 @@ function renderAttachments() {
     chip.textContent = `${file.name} · ${Math.ceil(file.content.length / 1024)} KB`;
     attachmentList.append(chip);
   }
+  for (const file of imageAttachments) {
+    const chip = document.createElement("span");
+    chip.className = "attachment-chip";
+    chip.textContent = `Image: ${file.name}`;
+    attachmentList.append(chip);
+  }
 }
 
 document.querySelector("#attach-files").addEventListener("click", () => fileInput.click());
@@ -556,8 +566,24 @@ thinkingModeButton.addEventListener("click", () => {
   showNotice(thinkingMode ? "Detailed explanation mode enabled: Audora will show more solution steps and checks." : "Detailed explanation mode disabled.");
 });
 fileInput.addEventListener("change", async () => {
-  const selected = Array.from(fileInput.files || []).slice(0, 4 - attachments.length);
+  const selected = Array.from(fileInput.files || []).slice(0, Math.max(0, 4 - attachments.length - imageAttachments.length));
   for (const file of selected) {
+    if (file.type.startsWith("image/")) {
+      if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) { showNotice(`${file.name}: use PNG, JPG, or WebP images.`); continue; }
+      if (imageAttachments.length >= 3) { showNotice("Attach up to 3 images per message."); continue; }
+      if (file.size > 1_000_000) { showNotice(`${file.name} is too large. Images are limited to 1 MB each.`); continue; }
+      try {
+        const data = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(String(reader.result || ""));
+          reader.onerror = () => reject(new Error("Image read failed"));
+          reader.readAsDataURL(file);
+        });
+        if (!/^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(data)) throw new Error("Unsupported image data");
+        imageAttachments.push({ name: file.name.slice(0, 120), data });
+      } catch { showNotice(`Could not read ${file.name}.`); }
+      continue;
+    }
     if (file.size > 200000) { showNotice(`${file.name} is too large. Text attachments are limited to 200 KB each.`); continue; }
     try {
       const content = await file.text();
