@@ -4,7 +4,7 @@ import { fileURLToPath } from "node:url";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function readModels(value, fallbackModel) {
+function isLoopbackUrl(value) {\n  try { return ["localhost", "127.0.0.1", "::1"].includes(new URL(value).hostname.toLowerCase()); }\n  catch { return false; }\n}\n\nfunction readModels(value, fallbackModel) {
   if (!value) return [{ id: fallbackModel, label: "Audora Core" }];
   try {
     const models = JSON.parse(value);
@@ -193,7 +193,7 @@ export function createApp(environment = process.env) {
   app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, searchEnabled: Boolean(settings.searchUrl), models: settings.models.map(({ id, label }) => ({ id, label })) }));
   app.get("/api/health", (_request, response) => {
     const hostedDeployment = Boolean(environment.RENDER || environment.FLY_APP_NAME || environment.RAILWAY_ENVIRONMENT);
-    const loopbackProvider = /^https?:\\/\\/(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::\\d+)?(?:\\/|$)/i.test(settings.apiUrl || "");
+    const loopbackProvider = isLoopbackUrl(settings.apiUrl);
     const providerConfigured = Boolean(settings.apiUrl) && (settings.provider === "ollama" || Boolean(settings.apiKey)) && !(hostedDeployment && loopbackProvider);
     response.json({
       name: settings.brandName,
@@ -288,7 +288,7 @@ export function createApp(environment = process.env) {
     if (!validMessages(messages) || messages.at(-1)?.role !== "user" || (!messageText(messages.at(-1).content).trim() && !(Array.isArray(messages.at(-1).content) && messages.at(-1).content.some((part) => part?.type === "image_url")))) return response.status(400).json({ error: "Provide 1–40 user or assistant messages, each up to 12,000 characters." });
     if (requestedModel && !settings.models.some((candidate) => candidate.id === requestedModel)) return response.status(400).json({ error: "The selected model is not available for this workspace." });
     const hostedDeployment = Boolean(environment.RENDER || environment.FLY_APP_NAME || environment.RAILWAY_ENVIRONMENT);
-    const loopbackProvider = /^https?:\\/\\/(localhost|127\\.0\\.0\\.1|\\[::1\\])(?::\\d+)?(?:\\/|$)/i.test(settings.apiUrl || "");
+    const loopbackProvider = isLoopbackUrl(settings.apiUrl);
     if (settings.provider === "compatible" && (!settings.apiKey || !settings.apiUrl || (hostedDeployment && loopbackProvider))) {
       return response.status(503).json({ error: "AI is not connected yet. In your hosting dashboard, set AUDORA_API_URL to a reachable OpenAI-compatible chat-completions endpoint, AUDORA_API_KEY to its secret key, and AUDORA_MODEL to the exact model ID. On Render, do not use localhost or 127.0.0.1: those addresses point to the Audora web container, not your separate model server. Save the environment variables and redeploy." });
     }
