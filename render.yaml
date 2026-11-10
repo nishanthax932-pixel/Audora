@@ -14,6 +14,14 @@ services:
         value: 22
       - key: AUDORA_TRUST_PROXY
         value: "1"
+      - key: AUDORA_PROVIDER
+        value: deepseek
+      - key: AUDORA_API_URL
+        value: https://api.deepseek.com/chat/completions
+      - key: AUDORA_MODEL
+        value: deepseek-flash
+      - key: AUDORA_MODELS
+        value: '[{"id":"deepseek-flash","label":"DeepSeek Flash"},{"id":"deepseek-v4-pro","label":"DeepSeek V4 Pro"}]'
       - key: AUDORA_BRAND_NAME
         value: Audora
       - key: AUDORA_BRAND_TAGLINE
