@@ -316,7 +316,7 @@ function stopGeneration() {
 
 async function sendMessage(content, { appendUser = true } = {}) {
   const chat = currentChat();
-  if (!chat || isGenerating || !content.trim()) return;
+  if (!chat || isGenerating || (!content.trim() && !attachments.length && !imageAttachments.length)) return;
   chat.model = modelSelect.value;
   const fileContext = attachments.map((file) => `\n\n[Attached file: ${file.name}]\n${file.content}`).join("");
   const imageContext = imageAttachments.map((file) => `\n[Attached image: ${file.name}]`).join("");
