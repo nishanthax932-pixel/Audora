@@ -110,7 +110,7 @@ function validMessages(messages) {
 }
 
 
-async function streamProviderResponse(providerResponse, provider, response, signal) {
+export async function streamProviderResponse(providerResponse, provider, response, signal) {
   response.status(200);
   response.set({
     "Content-Type": "text/event-stream; charset=utf-8",
@@ -135,7 +135,7 @@ async function streamProviderResponse(providerResponse, provider, response, sign
     const trimmed = line.trim();
     if (!trimmed) return;
     let raw = trimmed;
-    if (provider === "compatible") {
+    if (provider !== "ollama") {
       if (!raw.startsWith("data:")) return;
       raw = raw.slice(5).trim();
       if (raw === "[DONE]") return;
