@@ -353,12 +353,24 @@ test("passes bounded custom assistant instructions without replacing core safety
 });
 
 
-test("rejects malformed or oversized multimodal image content before contacting a provider", async () => {
+test("rejects malformed multimodal image content before contacting a provider", async () => {
   await withServer({}, async (url) => {
     const response = await fetch(url + "/api/chat", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "data:image/png;base64,not-valid!" } }] }] })
+    });
+    assert.equal(response.status, 400);
+  });
+});
+
+test("rejects image data URLs above the per-image size limit", async () => {
+  await withServer({}, async (url) => {
+    const oversized = "data:image/png;base64," + "A".repeat(1_400_000);
+    const response = await fetch(url + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: oversized } }] }] })
     });
     assert.equal(response.status, 400);
   });
