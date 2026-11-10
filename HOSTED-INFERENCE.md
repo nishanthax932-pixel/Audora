@@ -2,7 +2,20 @@
 
 The Audora web service and the AI model are two separate services. Deploying the Node/Express app to Render does **not** start vLLM, Ollama, or download a model checkpoint.
 
-## Configure a hosted OpenAI-compatible model endpoint
+## Configure DeepSeek (recommended quick setup)
+
+DeepSeek exposes an OpenAI-compatible chat-completions API, so Audora can connect without a separate vLLM server. In Render, open the Audora web service → **Environment** and set:
+
+- `AUDORA_PROVIDER=deepseek`
+- `AUDORA_API_URL=https://api.deepseek.com/chat/completions`
+- `AUDORA_API_KEY=YOUR_DEEPSEEK_API_KEY` (create it in the [DeepSeek Platform](https://platform.deepseek.com/); keep it secret)
+- `AUDORA_MODEL=deepseek-flash`
+
+For stronger, more expensive reasoning you can choose `deepseek-v4-pro`; use `deepseek-flash` as the normal default. Audora sends DeepSeek thinking mode enabled when its Reasoning option is enabled, and disabled otherwise. DeepSeek API usage is billed separately; the free DeepSeek chat website does not mean API calls are free. Check current pricing and account balance before use.
+
+After saving variables, redeploy and test a real chat prompt. `/api/health` only checks that configuration exists; it does not prove that the key works or that a model can answer.
+
+## Configure another hosted OpenAI-compatible model endpoint
 
 In Render, open the Audora web service → **Environment** and set:
 

@@ -22,14 +22,14 @@ function readModels(value, fallbackModel) {
 
 function resolveProvider(environment) {
   const requested = environment.AUDORA_PROVIDER;
-  if (["ollama", "compatible"].includes(requested)) return requested;
+  if (["ollama", "compatible", "deepseek"].includes(requested)) return requested;
   if (requested) return "compatible";
   return "compatible";
 }
 
 function getSettings(environment = process.env) {
   const provider = resolveProvider(environment);
-  const fallbackModel = environment.AUDORA_MODEL || (provider === "ollama" ? "qwen3:8b" : "audora-local");
+  const fallbackModel = environment.AUDORA_MODEL || (provider === "ollama" ? "qwen3:8b" : provider === "deepseek" ? "deepseek-flash" : "audora-local");
   const models = readModels(environment.AUDORA_MODELS, fallbackModel);
   return {
     brandName: (environment.AUDORA_BRAND_NAME || "Audora").slice(0, 80),
@@ -44,7 +44,9 @@ function getSettings(environment = process.env) {
     searchUrl: environment.AUDORA_SEARCH_URL || "",
     apiUrl: provider === "ollama"
       ? (environment.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat")
-      : (environment.AUDORA_API_URL || "http://127.0.0.1:8000/v1/chat/completions"),
+      : provider === "deepseek"
+        ? (environment.AUDORA_API_URL || "https://api.deepseek.com/chat/completions")
+        : (environment.AUDORA_API_URL || "http://127.0.0.1:8000/v1/chat/completions"),
     timeoutMs: Math.min(Math.max(Number(environment.AUDORA_REQUEST_TIMEOUT_MS || 60000), 1000), 120000),
     rateLimitMax: Math.min(Math.max(Number(environment.AUDORA_RATE_LIMIT_MAX || 30), 1), 10000),
     rateLimitWindowMs: Math.min(Math.max(Number(environment.AUDORA_RATE_LIMIT_WINDOW_MS || 60000), 1000), 3600000),
@@ -205,7 +207,7 @@ export function createApp(environment = process.env) {
       status: providerConfigured ? "configured" : "setup-required",
       provider: settings.provider,
       deployment: hostedDeployment ? "hosted" : "self-hosted",
-      providerUrlConfigured: Boolean(environment.AUDORA_API_URL || (settings.provider === "ollama" && environment.AUDORA_OLLAMA_URL)),
+      providerUrlConfigured: Boolean(environment.AUDORA_API_URL || settings.provider === "deepseek" || (settings.provider === "ollama" && environment.AUDORA_OLLAMA_URL)),
       apiKeyConfigured: settings.provider === "ollama" || Boolean(settings.apiKey),
       loopbackProviderBlocked: hostedDeployment && loopbackProvider,
       providerConfigured,
@@ -294,7 +296,7 @@ export function createApp(environment = process.env) {
     if (requestedModel && !settings.models.some((candidate) => candidate.id === requestedModel)) return response.status(400).json({ error: "The selected model is not available for this workspace." });
     const hostedDeployment = Boolean(environment.RENDER || environment.FLY_APP_NAME || environment.RAILWAY_ENVIRONMENT);
     const loopbackProvider = isLoopbackUrl(settings.apiUrl);
-    if (settings.provider === "compatible" && (!settings.apiKey || !settings.apiUrl || (hostedDeployment && loopbackProvider))) {
+    if (settings.provider !== "ollama" && (!settings.apiKey || !settings.apiUrl || (hostedDeployment && loopbackProvider))) {
       return response.status(503).json({ error: "The local inference server or hosted model endpoint is not connected yet. In your hosting dashboard, set AUDORA_API_URL to a reachable OpenAI-compatible chat-completions endpoint, AUDORA_API_KEY to its secret key, and AUDORA_MODEL to the exact model ID. On Render, do not use localhost or 127.0.0.1: those addresses point to the Audora web container, not your separate model server. Save the environment variables and redeploy." });
     }
     if (settings.provider === "ollama" && hostedDeployment && loopbackProvider) {
@@ -308,7 +310,7 @@ export function createApp(environment = process.env) {
     });
     try {
       const headers = { "Content-Type": "application/json" };
-      if (settings.provider === "compatible") headers.Authorization = `Bearer ${settings.apiKey}`;
+      if (settings.provider !== "ollama") headers.Authorization = `Bearer ${settings.apiKey}`;
       const wantsStream = request.body?.stream === true;
       const providerMessages = settings.provider === "ollama"
         ? messages.map((message) => {
@@ -320,7 +322,7 @@ export function createApp(environment = process.env) {
         : messages;
       const providerBody = settings.provider === "ollama"
         ? { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...providerMessages], stream: wantsStream, options: { temperature: 0.7 } }
-        : { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...providerMessages], temperature: 0.7, stream: wantsStream };
+        : { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...providerMessages], temperature: 0.7, stream: wantsStream, ...(settings.provider === "deepseek" ? { thinking: { type: reasoning === true ? "enabled" : "disabled" }, ...(reasoning === true ? { reasoning_effort: "high" } : {}) } : {}) };
       const providerResponse = await fetch(settings.apiUrl, { method: "POST", signal: aborter.signal, headers, body: JSON.stringify(providerBody) });
       if (!providerResponse.ok) {
         const status = providerResponse.status >= 400 && providerResponse.status < 600 ? providerResponse.status : 502;
@@ -336,7 +338,7 @@ export function createApp(environment = process.env) {
       const payload = await providerResponse.json().catch(() => ({}));
       return response.json({ message: settings.provider === "ollama" ? (payload.message?.content || "The local model returned an empty response.") : (payload.choices?.[0]?.message?.content || "The model returned an empty response."), model: model.label });
     } catch (error) {
-      const unreachable = settings.provider === "ollama" ? "Audora could not reach Ollama. Start Ollama and pull the model named in .env." : "Audora could not reach the local inference server. Start vLLM and check AUDORA_API_URL.";
+      const unreachable = settings.provider === "ollama" ? "Audora could not reach Ollama. Start Ollama and pull the model named in .env." : settings.provider === "deepseek" ? "Audora could not reach DeepSeek. Check the DeepSeek API key, account balance, endpoint, and model ID in your hosting environment." : "Audora could not reach the local inference server. Start vLLM and check AUDORA_API_URL.";
       return response.status(error.name === "AbortError" ? 504 : 502).json({ error: error.name === "AbortError" ? "The model took too long to respond. Please try again." : unreachable });
     } finally { clearTimeout(timer); }
   });
