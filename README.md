@@ -81,7 +81,7 @@ consistency instead of exposing hidden scratchpad reasoning.
 
 Chat history and profile memory are stored in browser local storage. There is
 no account login, cross-device sync, or cloud chat database in this starter.
-Text/code attachments and safe Markdown rendering are supported. Web search and source-link citations are available when SearXNG is configured; live token streaming is supported by compatible and Ollama providers. Autonomous multi-step tool execution is not yet implemented.
+Text/code attachments and safe Markdown rendering are supported. PDF and DOCX text can be extracted locally in the browser (up to 5 MB per file, 20 PDF pages, and 10,000 extracted characters); the extracted text is sent with the chat request, while the original document is not uploaded as a separate file. PDF/DOCX extraction downloads the pinned PDF.js and Mammoth libraries on first use. Conversation backups can be imported from a previous Audora JSON export. Image understanding still depends on a configured vision-capable model. Web search and source-link citations are available when SearXNG is configured; live token streaming is supported by compatible and Ollama providers. Autonomous multi-step tool execution is not yet implemented.
 Image generation has a self-hosted UI/API path; it remains disabled until a local Diffusers checkpoint, CUDA GPU, and matching server secret are configured. See `image/README.md`.
 
 ## Everyday user guide
