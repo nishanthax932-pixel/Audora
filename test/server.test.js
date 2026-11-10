@@ -416,3 +416,28 @@ test("health reports the real limits of browser document, image, and voice featu
     assert.equal(health.liveInferenceVerified, false);
   });
 });
+
+test("accepts image-only user messages for vision-capable providers", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://provider.invalid/")) {
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: "I can see the attached image." } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "compatible", AUDORA_API_URL: "https://provider.invalid/chat", AUDORA_API_KEY: "test-only" }, async (url) => {
+      const response = await originalFetch(url + "/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: [
+          { type: "image_url", image_url: { url: "data:image/png;base64,aGVsbG8=" } }
+        ] }] })
+      });
+      assert.equal(response.status, 200);
+      assert.equal(requestBody.messages[1].content[0].type, "image_url");
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
