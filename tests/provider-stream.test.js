@@ -30,7 +30,7 @@ function providerStream(lines) {
 
 function eventsFrom(response) {
   return response.chunks.map((chunk) => {
-    const match = chunk.match(/^event: ([^\\n]+)\\ndata: (.+)\\n\\n$/);
+    const match = chunk.match(/^event: ([^\n]+)\ndata: (.+)\n\n$/);
     return match ? { event: match[1], data: JSON.parse(match[2]) } : null;
   }).filter(Boolean);
 }
@@ -39,9 +39,9 @@ test("DeepSeek SSE streams text deltas and a final message", async () => {
   const response = makeResponse();
   const upstream = {
     body: providerStream([
-      'data: {"choices":[{"delta":{"content":"Hello"}}]}\\n',
-      'data: {"choices":[{"delta":{"content":" Audora"}}]}\\n',
-      "data: [DONE]\\n"
+      'data: {"choices":[{"delta":{"content":"Hello"}}]}\n',
+      'data: {"choices":[{"delta":{"content":" Audora"}}]}\n',
+      "data: [DONE]\n"
     ])
   };
 
@@ -57,7 +57,7 @@ test("DeepSeek SSE streams text deltas and a final message", async () => {
 test("OpenAI-compatible SSE streaming remains supported", async () => {
   const response = makeResponse();
   const upstream = {
-    body: providerStream(['data: {"choices":[{"delta":{"content":"Works"}}]}\\n', "data: [DONE]\\n"])
+    body: providerStream(['data: {"choices":[{"delta":{"content":"Works"}}]}\n', "data: [DONE]\n"])
   };
 
   await streamProviderResponse(upstream, "compatible", response, new AbortController().signal);
@@ -68,7 +68,7 @@ test("OpenAI-compatible SSE streaming remains supported", async () => {
 test("Ollama newline-delimited JSON streaming remains supported", async () => {
   const response = makeResponse();
   const upstream = {
-    body: providerStream(['{"message":{"content":"Local"}}\\n', '{"message":{"content":" model"}}\\n'])
+    body: providerStream(['{"message":{"content":"Local"}}\n', '{"message":{"content":" model"}}\n'])
   };
 
   await streamProviderResponse(upstream, "ollama", response, new AbortController().signal);
