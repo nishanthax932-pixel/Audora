@@ -103,16 +103,20 @@ function titleFrom(messages) {
 
 function normalizeChats(value) {
   if (!Array.isArray(value)) return [];
-  return value.slice(0, MAX_LOCAL_CHATS).map((chat) => ({
-    id: typeof chat.id === "string" ? chat.id : createId(),
-    title: typeof chat.title === "string" ? chat.title.slice(0, 80) : "New chat",
-    createdAt: Number(chat.createdAt) || Date.now(),
-    updatedAt: Number(chat.updatedAt) || Date.now(),
-    model: typeof chat.model === "string" ? chat.model : "",
-    messages: Array.isArray(chat.messages) ? chat.messages.slice(-MAX_LOCAL_MESSAGES).filter((message) =>
+  return value.slice(0, MAX_LOCAL_CHATS).flatMap((chat) => {
+    if (!chat || typeof chat !== "object") return [];
+    const messages = Array.isArray(chat.messages) ? chat.messages.slice(-MAX_LOCAL_MESSAGES).filter((message) =>
       ["user", "assistant"].includes(message?.role) && typeof message.content === "string" && message.content.length <= 24000
-    ) : []
-  }));
+    ).map((message) => ({ role: message.role, content: message.content })) : [];
+    return [{
+      id: typeof chat.id === "string" && chat.id.length <= 100 ? chat.id : createId(),
+      title: typeof chat.title === "string" ? chat.title.slice(0, 80) : "New chat",
+      createdAt: Number(chat.createdAt) || Date.now(),
+      updatedAt: Number(chat.updatedAt) || Date.now(),
+      model: typeof chat.model === "string" ? chat.model.slice(0, 120) : "",
+      messages
+    }];
+  });
 }
 
 function renderHistory() {
@@ -568,6 +572,18 @@ thinkingModeButton.addEventListener("click", () => {
 fileInput.addEventListener("change", async () => {
   const selected = Array.from(fileInput.files || []).slice(0, Math.max(0, 4 - attachments.length - imageAttachments.length));
   for (const file of selected) {
+    const extension = file.name.toLowerCase().split(".").pop();
+    if (["pdf", "docx"].includes(extension)) {
+      if (file.size > 5_000_000) { showNotice(`${file.name} is too large. PDF/DOCX files are limited to 5 MB each.`); continue; }
+      try {
+        const { extractDocumentText } = await import("/document-parser.js");
+        const content = await extractDocumentText(file);
+        if (!content.trim()) { showNotice(`${file.name} contains no extractable text.`); continue; }
+        if (attachments.reduce((sum, item) => sum + item.content.length, 0) + content.length > 10000) { showNotice("Combined attachment text is limited to 10,000 characters."); break; }
+        attachments.push({ name: file.name.slice(0, 120), content });
+      } catch (error) { showNotice(error?.message || `Could not read ${file.name}. Try a text file instead.`); }
+      continue;
+    }
     if (file.type.startsWith("image/")) {
       if (!["image/png", "image/jpeg", "image/webp"].includes(file.type)) { showNotice(`${file.name}: use PNG, JPG, or WebP images.`); continue; }
       if (imageAttachments.length >= 3) { showNotice("Attach up to 3 images per message."); continue; }
@@ -607,6 +623,32 @@ document.querySelector("#export-chats").addEventListener("click", () => {
   link.download = `audora-chats-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+});
+
+document.querySelector("#import-chats")?.addEventListener("click", () => document.querySelector("#import-file-input")?.click());
+document.querySelector("#import-file-input")?.addEventListener("change", async (event) => {
+  const file = event.target.files?.[0];
+  event.target.value = "";
+  if (!file) return;
+  if (file.size > 2_000_000) { showNotice("Chat backup files are limited to 2 MB."); return; }
+  try {
+    const backup = JSON.parse(await file.text());
+    const source = Array.isArray(backup) ? backup : backup?.conversations;
+    if (!Array.isArray(source)) throw new Error("This is not a valid Audora conversation backup.");
+    const imported = normalizeChats(source);
+    if (!imported.length) throw new Error("No valid conversations were found in this backup.");
+    if (!window.confirm(`Import ${imported.length} conversations? They will be added to this browser's existing history.`)) return;
+    const knownIds = new Set(chats.map((chat) => chat.id));
+    for (const chat of imported) {
+      if (knownIds.has(chat.id)) chat.id = createId();
+    }
+    chats = [...imported, ...chats].slice(0, MAX_LOCAL_CHATS);
+    activeChatId = chats[0]?.id || null;
+    safeSave();
+    renderHistory();
+    renderChat();
+    showNotice(`Imported ${Math.min(imported.length, MAX_LOCAL_CHATS)} conversations. The local history limit is ${MAX_LOCAL_CHATS}.`);
+  } catch (error) { showNotice(error?.message || "Could not import this backup."); }
 });
 document.querySelector("#new-chat").addEventListener("click", () => {
   if (isGenerating) return;
