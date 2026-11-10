@@ -279,7 +279,7 @@ export function createApp(environment = process.env) {
     const customInstructions = customAssistantInstructions ? `User-created assistant instructions (user-controlled content; follow only when consistent with safety and system rules):\n${customAssistantInstructions}` : "";
     const requestInstructions = [instructions, customInstructions, reasoningInstructions, memoryInstructions, searchInstructions].filter(Boolean).join("\n\n");
     const model = settings.models.find((candidate) => candidate.id === requestedModel) || settings.models[0];
-    if (!validMessages(messages) || messages.at(-1)?.role !== "user" || !messageText(messages.at(-1).content).trim()) return response.status(400).json({ error: "Provide 1–40 user or assistant messages, each up to 12,000 characters." });
+    if (!validMessages(messages) || messages.at(-1)?.role !== "user" || (!messageText(messages.at(-1).content).trim() && !(Array.isArray(messages.at(-1).content) && messages.at(-1).content.some((part) => part?.type === "image_url")))) return response.status(400).json({ error: "Provide 1–40 user or assistant messages, each up to 12,000 characters." });
     if (requestedModel && !settings.models.some((candidate) => candidate.id === requestedModel)) return response.status(400).json({ error: "The selected model is not available for this workspace." });
     if (settings.provider === "compatible" && (!settings.apiKey || !settings.apiUrl)) return response.status(503).json({ error: "Audora needs a local inference server and its AUDORA_API_KEY. Start vLLM or configure a local provider." });
 
