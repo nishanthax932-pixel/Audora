@@ -20,11 +20,15 @@ function save() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(assistants));
     localStorage.setItem(ACTIVE_KEY, activeId);
-  } catch { notice("Browser storage is full. Export or remove an assistant."); }
+    return true;
+  } catch {
+    notice("Browser storage is full. Your changes were not saved. Export or remove an assistant.");
+    return false;
+  }
 }
 function saveActive() {
-  try { localStorage.setItem(ACTIVE_KEY, activeId); }
-  catch { notice("Your assistant selection could not be saved in this browser."); }
+  try { localStorage.setItem(ACTIVE_KEY, activeId); return true; }
+  catch { notice("Your assistant selection could not be saved in this browser."); return false; }
 }
 function notice(message) {
   const node = $("#app-notice");
@@ -74,7 +78,10 @@ function renderList() {
     const use = document.createElement("button");
     use.textContent = activeId === assistant.id ? "Selected" : "Use";
     use.addEventListener("click", () => {
-      activeId = assistant.id; saveActive(); renderSelect(); renderList(); $("#assistant-dialog").close();
+      const previousId = activeId;
+      activeId = assistant.id;
+      if (!saveActive()) { activeId = previousId; return; }
+      renderSelect(); renderList(); $("#assistant-dialog").close();
       notice(assistant.name + " is now your active assistant.");
     });
     const edit = document.createElement("button");
@@ -87,9 +94,12 @@ function renderList() {
     remove.textContent = "Delete";
     remove.addEventListener("click", () => {
       if (!confirm("Delete " + assistant.name + " from this browser?")) return;
+      const previousAssistants = assistants;
+      const previousActiveId = activeId;
       assistants = assistants.filter((item) => item.id !== assistant.id);
       if (activeId === assistant.id) activeId = "";
-      save(); renderSelect(); renderList();
+      if (!save()) { assistants = previousAssistants; activeId = previousActiveId; return; }
+      renderSelect(); renderList();
     });
     actions.append(use, edit, share, remove);
     card.append(info, actions); list.append(card);
@@ -136,8 +146,12 @@ function importSharedAssistant() {
     if (!confirm('Import "' + item.name + '" into your Audora assistants?')) return;
     const imported = { ...item, id: id(), name: item.name, avatar: String(item.avatar || "✦").slice(0, 8),
       description: String(item.description || "").slice(0, 180), instructions: item.instructions };
+    const previousAssistants = assistants;
+    const previousActiveId = activeId;
     assistants = [imported, ...assistants].slice(0, 50);
-    activeId = imported.id; save(); renderSelect(); renderList();
+    activeId = imported.id;
+    if (!save()) { assistants = previousAssistants; activeId = previousActiveId; return; }
+    renderSelect(); renderList();
     history.replaceState(null, "", location.pathname + location.search);
     notice("Assistant imported. It is saved only in this browser.");
   } catch { notice("This assistant share link is invalid or incomplete."); }
@@ -190,8 +204,12 @@ document.addEventListener("DOMContentLoaded", () => {
       avatar: ($("#assistant-avatar").value.trim() || "✦").slice(0, 8),
       description: $("#assistant-description").value.trim(), instructions: $("#assistant-instructions").value.trim() };
     if (!assistant.name || !assistant.instructions) return;
+    const previousAssistants = assistants;
+    const previousActiveId = activeId;
     assistants = editingId ? assistants.map((item) => item.id === editingId ? assistant : item) : [assistant, ...assistants];
-    activeId = assistant.id; save(); renderSelect(); renderList(); editor.close();
+    activeId = assistant.id;
+    if (!save()) { assistants = previousAssistants; activeId = previousActiveId; return; }
+    renderSelect(); renderList(); editor.close();
     notice(assistant.name + " saved and selected.");
   });
   const savedActiveId = (() => { try { return localStorage.getItem(ACTIVE_KEY) || ""; } catch { return ""; } })();
