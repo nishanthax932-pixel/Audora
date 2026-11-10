@@ -286,7 +286,7 @@ export function createApp(environment = process.env) {
       const providerMessages = settings.provider === "ollama"
         ? messages.map((message) => {
             if (typeof message.content === "string") return message;
-            const textContent = message.content.filter((part) => part.type === "text").map((part) => part.text).join("\\n");
+            const textContent = message.content.filter((part) => part.type === "text").map((part) => part.text).join("\n");
             const images = message.content.filter((part) => part.type === "image_url").map((part) => part.image_url.url.split(",")[1]);
             return { role: message.role, content: textContent, ...(images.length ? { images } : {}) };
           })
