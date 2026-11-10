@@ -1,0 +1,22 @@
+{
+  "id": "/",
+  "name": "Audora AI Workspace",
+  "short_name": "Audora",
+  "description": "A personal AI workspace you can install on your phone.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "any",
+  "background_color": "#171717",
+  "theme_color": "#171717",
+  "categories": ["productivity", "utilities"],
+  "icons": [
+    {
+      "src": "/icons/audora.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

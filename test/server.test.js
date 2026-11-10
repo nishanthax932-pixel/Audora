@@ -321,3 +321,123 @@ test("reports setup state and optional workspace services without claiming live 
     assert.equal(health.liveInferenceVerified, false);
   });
 });
+
+
+test("passes bounded custom assistant instructions without replacing core safety instructions", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://provider.invalid/")) {
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: "Custom assistant response" } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "compatible", AUDORA_API_URL: "https://provider.invalid/chat", AUDORA_API_KEY: "test-only" }, async (url) => {
+      const response = await originalFetch(url + "/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          messages: [{ role: "user", content: "Help me study" }],
+          assistantInstructions: "You are a patient science tutor. Explain with simple examples."
+        })
+      });
+      assert.equal(response.status, 200);
+      const systemPrompt = requestBody.messages[0].content;
+      assert.match(systemPrompt, /patient science tutor/);
+      assert.match(systemPrompt, /safety boundaries/i);
+      assert.match(systemPrompt, /Do not reveal private internal chain-of-thought/i);
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+
+test("rejects malformed multimodal image content before contacting a provider", async () => {
+  await withServer({}, async (url) => {
+    const response = await fetch(url + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "data:image/png;base64,not-valid!" } }] }] })
+    });
+    assert.equal(response.status, 400);
+  });
+});
+
+test("rejects image data URLs above the per-image size limit", async () => {
+  await withServer({}, async (url) => {
+    const oversized = "data:image/png;base64," + "A".repeat(1_400_000);
+    const response = await fetch(url + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: oversized } }] }] })
+    });
+    assert.equal(response.status, 400);
+  });
+});
+
+test("converts validated image data URLs to Ollama image payloads", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === "http://127.0.0.1:11434/api/chat") {
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({ message: { content: "I can see the image." } }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "ollama", AUDORA_MODEL: "vision-model" }, async (url) => {
+      const response = await originalFetch(url + "/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "vision-model",
+          messages: [{ role: "user", content: [
+            { type: "text", text: "Describe this picture." },
+            { type: "image_url", image_url: { url: "data:image/png;base64,aGVsbG8=" } }
+          ] }]
+        })
+      });
+      assert.equal(response.status, 200);
+      assert.deepEqual(requestBody.messages[1].images, ["aGVsbG8="]);
+      assert.equal(requestBody.messages[1].content, "Describe this picture.");
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
+
+test("health reports the real limits of browser document, image, and voice features", async () => {
+  await withServer({}, async (url) => {
+    const health = await (await fetch(`${url}/api/health`)).json();
+    assert.equal(health.documentParsing, "browser-local-pdf-docx");
+    assert.equal(health.imageUnderstanding, "vision-model-required");
+    assert.equal(health.voiceMode, "browser-speech-to-text");
+    assert.equal(health.accountsEnabled, false);
+    assert.equal(health.liveInferenceVerified, false);
+  });
+});
+
+test("accepts image-only user messages for vision-capable providers", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    if (String(url).startsWith("https://provider.invalid/")) {
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({ choices: [{ message: { content: "I can see the attached image." } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "compatible", AUDORA_API_URL: "https://provider.invalid/chat", AUDORA_API_KEY: "test-only" }, async (url) => {
+      const response = await originalFetch(url + "/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: [
+          { type: "image_url", image_url: { url: "data:image/png;base64,aGVsbG8=" } }
+        ] }] })
+      });
+      assert.equal(response.status, 200);
+      assert.equal(requestBody.messages[1].content[0].type, "image_url");
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
