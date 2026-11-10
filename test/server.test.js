@@ -351,3 +351,45 @@ test("passes bounded custom assistant instructions without replacing core safety
     });
   } finally { globalThis.fetch = originalFetch; }
 });
+
+
+test("rejects malformed or oversized multimodal image content before contacting a provider", async () => {
+  await withServer({}, async (url) => {
+    const response = await fetch(url + "/api/chat", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ messages: [{ role: "user", content: [{ type: "image_url", image_url: { url: "data:image/png;base64,not-valid!" } }] }] })
+    });
+    assert.equal(response.status, 400);
+  });
+});
+
+test("converts validated image data URLs to Ollama image payloads", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let requestBody;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === "http://127.0.0.1:11434/api/chat") {
+      requestBody = JSON.parse(options.body);
+      return new Response(JSON.stringify({ message: { content: "I can see the image." } }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "ollama", AUDORA_MODEL: "vision-model" }, async (url) => {
+      const response = await originalFetch(url + "/api/chat", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          model: "vision-model",
+          messages: [{ role: "user", content: [
+            { type: "text", text: "Describe this picture." },
+            { type: "image_url", image_url: { url: "data:image/png;base64,aGVsbG8=" } }
+          ] }]
+        })
+      });
+      assert.equal(response.status, 200);
+      assert.deepEqual(requestBody.messages[1].images, ["aGVsbG8="]);
+      assert.equal(requestBody.messages[1].content, "Describe this picture.");
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
