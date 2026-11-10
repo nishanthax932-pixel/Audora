@@ -197,7 +197,10 @@ export function createApp(environment = process.env) {
       models: settings.models.length,
       historyStorage: "browser-local",
       accountsEnabled: false,
-      liveInferenceVerified: false
+      liveInferenceVerified: false,
+      documentParsing: "browser-local-pdf-docx",
+      imageUnderstanding: "vision-model-required",
+      voiceMode: "browser-speech-to-text"
     });
   });
 
