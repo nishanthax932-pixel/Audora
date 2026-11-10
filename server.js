@@ -97,6 +97,18 @@ function validMessageContent(content, role) {
   });
 }
 
+function providerFailureMessage(provider, status) {
+  if (provider === "deepseek") {
+    if (status === 401 || status === 403) return "DeepSeek rejected the API key. Check AUDORA_API_KEY in your Render environment settings.";
+    if (status === 402) return "DeepSeek account balance or API credits are insufficient. Check your DeepSeek Platform billing.";
+    if (status === 404) return "DeepSeek could not find the requested model or endpoint. Check AUDORA_MODEL and AUDORA_API_URL.";
+    if (status === 429) return "DeepSeek rate limit reached. Wait a moment and try again.";
+    if (status >= 500) return "DeepSeek is temporarily unavailable. Please retry shortly.";
+    return "DeepSeek could not complete this request. Check the model ID, API key, and account status.";
+  }
+  return "The inference provider could not complete this request. Please try again or check the server configuration.";
+}
+
 function messageText(content) {
   return typeof content === "string"
     ? content
@@ -297,7 +309,7 @@ export function createApp(environment = process.env) {
     const hostedDeployment = Boolean(environment.RENDER || environment.FLY_APP_NAME || environment.RAILWAY_ENVIRONMENT);
     const loopbackProvider = isLoopbackUrl(settings.apiUrl);
     if (settings.provider !== "ollama" && (!settings.apiKey || !settings.apiUrl || (hostedDeployment && loopbackProvider))) {
-      return response.status(503).json({ error: "The local inference server or hosted model endpoint is not connected yet. In your hosting dashboard, set AUDORA_API_URL to a reachable OpenAI-compatible chat-completions endpoint, AUDORA_API_KEY to its secret key, and AUDORA_MODEL to the exact model ID. On Render, do not use localhost or 127.0.0.1: those addresses point to the Audora web container, not your separate model server. Save the environment variables and redeploy." });
+      return response.status(503).json({ error: settings.provider === "deepseek" ? "DeepSeek is selected but its API key is missing, or its endpoint is unreachable. In Render → Environment, set AUDORA_API_KEY to your DeepSeek Platform key, keep it secret, and redeploy." : "The local inference server or hosted model endpoint is not connected yet. Set AUDORA_API_URL to a reachable chat-completions endpoint, AUDORA_API_KEY to its secret key, and AUDORA_MODEL to the exact model ID. On Render, do not use localhost or 127.0.0.1." });
     }
     if (settings.provider === "ollama" && hostedDeployment && loopbackProvider) {
       return response.status(503).json({ error: "Ollama is configured at localhost, but the hosted Audora server cannot reach Ollama running on your phone or computer. Configure a securely reachable Ollama endpoint, or use an OpenAI-compatible hosted inference endpoint." });
@@ -329,7 +341,7 @@ export function createApp(environment = process.env) {
         // Provider error bodies can contain internal URLs, account details, or
         // other implementation data. Keep those details in server logs only.
         console.error("Audora provider request failed", { status, provider: settings.provider });
-        return response.status(status).json({ error: "The inference provider could not complete this request. Please try again or check the server configuration." });
+        return response.status(status).json({ error: providerFailureMessage(settings.provider, status) });
       }
       if (wantsStream) {
         await streamProviderResponse(providerResponse, settings.provider, response, aborter.signal);
