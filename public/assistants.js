@@ -178,7 +178,10 @@ document.addEventListener("DOMContentLoaded", () => {
   select.className = "assistant-select";
   select.setAttribute("aria-label", "Choose custom assistant");
   select.addEventListener("change", () => {
-    activeId = select.value; saveActive(); renderSelect();
+    const previousId = activeId;
+    activeId = select.value;
+    if (!saveActive()) { activeId = previousId; renderSelect(); return; }
+    renderSelect();
     const chosen = assistants.find((item) => item.id === activeId);
     notice(chosen ? chosen.name + " selected." : "Audora Core selected.");
   });
