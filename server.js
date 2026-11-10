@@ -79,9 +79,20 @@ function createRateLimiter(settings) {
   };
 }
 
+function validMessageContent(content, role) {
+  if (typeof content === "string") return content.length <= 12000;
+  if (role !== "user" || !Array.isArray(content) || content.length < 1 || content.length > 4) return false;
+  return content.every((part) => {
+    if (part?.type === "text") return typeof part.text === "string" && part.text.length <= 12000;
+    if (part?.type !== "image_url" || typeof part.image_url?.url !== "string") return false;
+    const data = part.image_url.url;
+    return data.length <= 1_400_000 && /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/]+=*$/.test(data);
+  });
+}
+
 function validMessages(messages) {
   return Array.isArray(messages) && messages.length > 0 && messages.length <= 40 && messages.every((message) =>
-    ["user", "assistant"].includes(message?.role) && typeof message.content === "string" && message.content.length <= 12000
+    ["user", "assistant"].includes(message?.role) && validMessageContent(message.content, message.role)
   );
 }
 
@@ -272,9 +283,17 @@ export function createApp(environment = process.env) {
       const headers = { "Content-Type": "application/json" };
       if (settings.provider === "compatible") headers.Authorization = `Bearer ${settings.apiKey}`;
       const wantsStream = request.body?.stream === true;
+      const providerMessages = settings.provider === "ollama"
+        ? messages.map((message) => {
+            if (typeof message.content === "string") return message;
+            const textContent = message.content.filter((part) => part.type === "text").map((part) => part.text).join("\\n");
+            const images = message.content.filter((part) => part.type === "image_url").map((part) => part.image_url.url.split(",")[1]);
+            return { role: message.role, content: textContent, ...(images.length ? { images } : {}) };
+          })
+        : messages;
       const providerBody = settings.provider === "ollama"
-        ? { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...messages], stream: wantsStream, options: { temperature: 0.7 } }
-        : { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...messages], temperature: 0.7, stream: wantsStream };
+        ? { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...providerMessages], stream: wantsStream, options: { temperature: 0.7 } }
+        : { model: model.id, messages: [{ role: "system", content: requestInstructions }, ...providerMessages], temperature: 0.7, stream: wantsStream };
       const providerResponse = await fetch(settings.apiUrl, { method: "POST", signal: aborter.signal, headers, body: JSON.stringify(providerBody) });
       if (!providerResponse.ok) {
         const status = providerResponse.status >= 400 && providerResponse.status < 600 ? providerResponse.status : 502;
