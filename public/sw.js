@@ -1,9 +1,10 @@
-const CACHE_NAME = "audora-shell-v1";
+const CACHE_NAME = "audora-shell-v2";
 const APP_SHELL = [
   "/",
   "/index.html",
   "/styles.css",
   "/app.js",
+  "/document-parser.js",
   "/assistants.js",
   "/image.js",
   "/pwa.js",
