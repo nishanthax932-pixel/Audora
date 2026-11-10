@@ -4,7 +4,12 @@ import { fileURLToPath } from "node:url";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
-function isLoopbackUrl(value) {\n  try { return ["localhost", "127.0.0.1", "::1"].includes(new URL(value).hostname.toLowerCase()); }\n  catch { return false; }\n}\n\nfunction readModels(value, fallbackModel) {
+function isLoopbackUrl(value) {
+  try { return ["localhost", "127.0.0.1", "::1"].includes(new URL(value).hostname.toLowerCase()); }
+  catch { return false; }
+}
+
+function readModels(value, fallbackModel) {
   if (!value) return [{ id: fallbackModel, label: "Audora Core" }];
   try {
     const models = JSON.parse(value);
