@@ -292,7 +292,7 @@ function renderMessage(role, content, { pending = false, error = false } = {}) {
       if (!chat || isGenerating || chat.messages.at(-1)?.role !== "assistant") return;
       const lastUser = chat.messages.slice(0, -1).reverse().find((item) => item.role === "user");
       if (!lastUser) return;
-      if (/\\[Attached image: /i.test(lastUser.content)) {
+      if (/\[Attached image: /i.test(lastUser.content)) {
         showNotice("Regenerate is unavailable for image prompts because image data is not stored in local history. Start a new prompt and reattach the image.");
         return;
       }
