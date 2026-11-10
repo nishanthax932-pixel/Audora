@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node -r dotenv/config server.js",
     "dev": "node -r dotenv/config --watch server.js",
-    "build": "node --check server.js && node --check public/app.js && node --check public/image.js",
+    "build": "node --check server.js && node --check public/app.js && node --check public/image.js && node --check public/document-parser.js",
     "test": "node --test",
     "doctor": "node scripts/doctor.mjs"
   },
