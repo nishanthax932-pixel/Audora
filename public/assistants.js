@@ -1,4 +1,5 @@
 const STORAGE_KEY = "audora-custom-assistants-v1";
+const ACTIVE_KEY = "audora-active-assistant-v1";
 const $ = (selector) => document.querySelector(selector);
 let assistants = [];
 let activeId = "";
@@ -16,8 +17,14 @@ function validAssistant(item) {
     item.instructions.length <= 3000;
 }
 function save() {
-  try { localStorage.setItem(STORAGE_KEY, JSON.stringify(assistants)); }
-  catch { notice("Browser storage is full. Export or remove an assistant."); }
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(assistants));
+    localStorage.setItem(ACTIVE_KEY, activeId);
+  } catch { notice("Browser storage is full. Export or remove an assistant."); }
+}
+function saveActive() {
+  try { localStorage.setItem(ACTIVE_KEY, activeId); }
+  catch { notice("Your assistant selection could not be saved in this browser."); }
 }
 function notice(message) {
   const node = $("#app-notice");
@@ -67,7 +74,7 @@ function renderList() {
     const use = document.createElement("button");
     use.textContent = activeId === assistant.id ? "Selected" : "Use";
     use.addEventListener("click", () => {
-      activeId = assistant.id; renderSelect(); renderList(); $("#assistant-dialog").close();
+      activeId = assistant.id; saveActive(); renderSelect(); renderList(); $("#assistant-dialog").close();
       notice(assistant.name + " is now your active assistant.");
     });
     const edit = document.createElement("button");
@@ -97,13 +104,27 @@ function openEditor(assistant = null) {
   $("#assistant-instructions").value = assistant?.instructions || "";
   $("#assistant-dialog").showModal();
 }
-function shareAssistant(assistant) {
+async function shareAssistant(assistant) {
   const payload = { name: assistant.name, avatar: assistant.avatar, description: assistant.description, instructions: assistant.instructions };
   const url = new URL(location.href);
   url.hash = "assistant=" + encode(payload);
   if (url.href.length > 7000) return notice("This assistant is too large to share as a link. Shorten its instructions.");
-  navigator.clipboard?.writeText(url.href).then(() => notice("Share link copied. Anyone with the link can import a copy."))
-    .catch(() => notice(url.href));
+  try {
+    if (!navigator.clipboard?.writeText) throw new Error("Clipboard unavailable");
+    await navigator.clipboard.writeText(url.href);
+    notice("Share link copied. Anyone with the link can import a copy.");
+  } catch {
+    const field = document.createElement("textarea");
+    field.value = url.href;
+    field.setAttribute("readonly", "");
+    field.style.position = "fixed";
+    field.style.opacity = "0";
+    document.body.append(field);
+    field.select();
+    const copied = document.execCommand("copy");
+    field.remove();
+    notice(copied ? "Share link copied. Anyone with the link can import a copy." : "Copy this assistant link from your browser address bar: " + url.href);
+  }
 }
 function importSharedAssistant() {
   const match = location.hash.match(/(?:^#|&)assistant=([A-Za-z0-9_-]+)/);
@@ -143,7 +164,7 @@ document.addEventListener("DOMContentLoaded", () => {
   select.className = "assistant-select";
   select.setAttribute("aria-label", "Choose custom assistant");
   select.addEventListener("change", () => {
-    activeId = select.value; renderSelect();
+    activeId = select.value; saveActive(); renderSelect();
     const chosen = assistants.find((item) => item.id === activeId);
     notice(chosen ? chosen.name + " selected." : "Audora Core selected.");
   });
@@ -173,5 +194,7 @@ document.addEventListener("DOMContentLoaded", () => {
     activeId = assistant.id; save(); renderSelect(); renderList(); editor.close();
     notice(assistant.name + " saved and selected.");
   });
+  const savedActiveId = (() => { try { return localStorage.getItem(ACTIVE_KEY) || ""; } catch { return ""; } })();
+  activeId = assistants.some((item) => item.id === savedActiveId) ? savedActiveId : "";
   renderSelect(); renderList(); importSharedAssistant();
 });
