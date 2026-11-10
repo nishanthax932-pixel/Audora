@@ -434,13 +434,15 @@ async function loadEngineStatus() {
     if (status.searchEnabled) services.push("search");
     if (status.imageConfigured) services.push("image generation");
     if (!status.providerConfigured) {
-      badge.textContent = "AI engine setup required";
+      badge.textContent = status.loopbackProviderBlocked ? "Model URL is local-only" : "Connect an AI model";
       badge.dataset.state = "warning";
-      badge.title = "The workspace is open, but no model API key/provider configuration was found. Configure the server before chatting.";
+      badge.title = status.loopbackProviderBlocked
+        ? "A hosted Render service cannot reach a model running at localhost. Open this status panel for setup steps."
+        : "The website is online, but model endpoint/API credentials are incomplete. Open this status panel for setup steps.";
     } else {
-      badge.textContent = "AI settings found · live model not verified";
+      badge.textContent = "Model settings detected · connection untested";
       badge.dataset.state = "configured";
-      badge.title = `Provider settings are present. This status does not test live inference.${services.length ? ` Optional services configured: ${services.join(", ")}.` : ""}`;
+      badge.title = `Provider settings are present. A successful live model response has not yet been verified.${services.length ? ` Optional services configured: ${services.join(", ")}.` : ""}`;
     }
   } catch (error) {
     badge.textContent = "API connection unavailable";

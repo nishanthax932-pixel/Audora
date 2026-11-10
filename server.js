@@ -4,6 +4,11 @@ import { fileURLToPath } from "node:url";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
+function isLoopbackUrl(value) {
+  try { return ["localhost", "127.0.0.1", "::1"].includes(new URL(value).hostname.toLowerCase()); }
+  catch { return false; }
+}
+
 function readModels(value, fallbackModel) {
   if (!value) return [{ id: fallbackModel, label: "Audora Core" }];
   try {
@@ -192,11 +197,17 @@ export function createApp(environment = process.env) {
 
   app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, searchEnabled: Boolean(settings.searchUrl), models: settings.models.map(({ id, label }) => ({ id, label })) }));
   app.get("/api/health", (_request, response) => {
-    const providerConfigured = Boolean(settings.apiUrl) && (settings.provider === "ollama" || Boolean(settings.apiKey));
+    const hostedDeployment = Boolean(environment.RENDER || environment.FLY_APP_NAME || environment.RAILWAY_ENVIRONMENT);
+    const loopbackProvider = isLoopbackUrl(settings.apiUrl);
+    const providerConfigured = Boolean(settings.apiUrl) && (settings.provider === "ollama" || Boolean(settings.apiKey)) && !(hostedDeployment && loopbackProvider);
     response.json({
       name: settings.brandName,
       status: providerConfigured ? "configured" : "setup-required",
       provider: settings.provider,
+      deployment: hostedDeployment ? "hosted" : "self-hosted",
+      providerUrlConfigured: Boolean(environment.AUDORA_API_URL || (settings.provider === "ollama" && environment.AUDORA_OLLAMA_URL)),
+      apiKeyConfigured: settings.provider === "ollama" || Boolean(settings.apiKey),
+      loopbackProviderBlocked: hostedDeployment && loopbackProvider,
       providerConfigured,
       imageConfigured: Boolean(settings.imageApiKey),
       searchEnabled: Boolean(settings.searchUrl),
@@ -281,7 +292,14 @@ export function createApp(environment = process.env) {
     const model = settings.models.find((candidate) => candidate.id === requestedModel) || settings.models[0];
     if (!validMessages(messages) || messages.at(-1)?.role !== "user" || (!messageText(messages.at(-1).content).trim() && !(Array.isArray(messages.at(-1).content) && messages.at(-1).content.some((part) => part?.type === "image_url")))) return response.status(400).json({ error: "Provide 1–40 user or assistant messages, each up to 12,000 characters." });
     if (requestedModel && !settings.models.some((candidate) => candidate.id === requestedModel)) return response.status(400).json({ error: "The selected model is not available for this workspace." });
-    if (settings.provider === "compatible" && (!settings.apiKey || !settings.apiUrl)) return response.status(503).json({ error: "Audora needs a local inference server and its AUDORA_API_KEY. Start vLLM or configure a local provider." });
+    const hostedDeployment = Boolean(environment.RENDER || environment.FLY_APP_NAME || environment.RAILWAY_ENVIRONMENT);
+    const loopbackProvider = isLoopbackUrl(settings.apiUrl);
+    if (settings.provider === "compatible" && (!settings.apiKey || !settings.apiUrl || (hostedDeployment && loopbackProvider))) {
+      return response.status(503).json({ error: "The local inference server or hosted model endpoint is not connected yet. In your hosting dashboard, set AUDORA_API_URL to a reachable OpenAI-compatible chat-completions endpoint, AUDORA_API_KEY to its secret key, and AUDORA_MODEL to the exact model ID. On Render, do not use localhost or 127.0.0.1: those addresses point to the Audora web container, not your separate model server. Save the environment variables and redeploy." });
+    }
+    if (settings.provider === "ollama" && hostedDeployment && loopbackProvider) {
+      return response.status(503).json({ error: "Ollama is configured at localhost, but the hosted Audora server cannot reach Ollama running on your phone or computer. Configure a securely reachable Ollama endpoint, or use an OpenAI-compatible hosted inference endpoint." });
+    }
 
     const aborter = new AbortController();
     const timer = setTimeout(() => aborter.abort(), settings.timeoutMs);
