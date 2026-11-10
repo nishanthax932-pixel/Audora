@@ -49,8 +49,10 @@ const currentChat = () => chats.find((chat) => chat.id === activeChatId);
 function safeSave() {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(chats.slice(0, MAX_LOCAL_CHATS)));
+    return true;
   } catch {
     showNotice("Local storage is full. Export or delete older chats to save more.");
+    return false;
   }
 }
 
@@ -288,9 +290,13 @@ function renderMessage(role, content, { pending = false, error = false } = {}) {
     regenerate.addEventListener("click", () => {
       const chat = currentChat();
       if (!chat || isGenerating || chat.messages.at(-1)?.role !== "assistant") return;
-      chat.messages.pop();
-      const lastUser = [...chat.messages].reverse().find((item) => item.role === "user");
+      const lastUser = chat.messages.slice(0, -1).reverse().find((item) => item.role === "user");
       if (!lastUser) return;
+      if (/\\[Attached image: /i.test(lastUser.content)) {
+        showNotice("Regenerate is unavailable for image prompts because image data is not stored in local history. Start a new prompt and reattach the image.");
+        return;
+      }
+      chat.messages.pop();
       safeSave();
       renderChat();
       sendMessage(lastUser.content, { appendUser: false });
@@ -642,9 +648,17 @@ document.querySelector("#import-file-input")?.addEventListener("change", async (
     for (const chat of imported) {
       if (knownIds.has(chat.id)) chat.id = createId();
     }
+    const previousChats = chats;
+    const previousActiveChatId = activeChatId;
     chats = [...imported, ...chats].slice(0, MAX_LOCAL_CHATS);
     activeChatId = chats[0]?.id || null;
-    safeSave();
+    if (!safeSave()) {
+      chats = previousChats;
+      activeChatId = previousActiveChatId;
+      renderHistory();
+      renderChat();
+      return;
+    }
     renderHistory();
     renderChat();
     showNotice(`Imported ${Math.min(imported.length, MAX_LOCAL_CHATS)} conversations. The local history limit is ${MAX_LOCAL_CHATS}.`);
