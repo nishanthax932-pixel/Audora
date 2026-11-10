@@ -295,7 +295,7 @@ export function createApp(environment = process.env) {
     const hostedDeployment = Boolean(environment.RENDER || environment.FLY_APP_NAME || environment.RAILWAY_ENVIRONMENT);
     const loopbackProvider = isLoopbackUrl(settings.apiUrl);
     if (settings.provider === "compatible" && (!settings.apiKey || !settings.apiUrl || (hostedDeployment && loopbackProvider))) {
-      return response.status(503).json({ error: "AI is not connected yet. In your hosting dashboard, set AUDORA_API_URL to a reachable OpenAI-compatible chat-completions endpoint, AUDORA_API_KEY to its secret key, and AUDORA_MODEL to the exact model ID. On Render, do not use localhost or 127.0.0.1: those addresses point to the Audora web container, not your separate model server. Save the environment variables and redeploy." });
+      return response.status(503).json({ error: "The local inference server or hosted model endpoint is not connected yet. In your hosting dashboard, set AUDORA_API_URL to a reachable OpenAI-compatible chat-completions endpoint, AUDORA_API_KEY to its secret key, and AUDORA_MODEL to the exact model ID. On Render, do not use localhost or 127.0.0.1: those addresses point to the Audora web container, not your separate model server. Save the environment variables and redeploy." });
     }
     if (settings.provider === "ollama" && hostedDeployment && loopbackProvider) {
       return response.status(503).json({ error: "Ollama is configured at localhost, but the hosted Audora server cannot reach Ollama running on your phone or computer. Configure a securely reachable Ollama endpoint, or use an OpenAI-compatible hosted inference endpoint." });
