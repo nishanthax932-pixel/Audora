@@ -1,9 +1,13 @@
 # Audora
 
-**Audora** is a self-hostable AI workspace intended to run open-weight models
-on infrastructure controlled by Audora. It does not silently send prompts to
-a third-party text-generation service. Optional image generation uses an
-Audora-controlled local Diffusers checkpoint and never calls a hosted image API.
+**Audora** is a configurable AI workspace that can use a self-hosted
+OpenAI-compatible model, local Ollama, or the hosted DeepSeek API. The
+`.env.example` and Render blueprint currently select DeepSeek by default;
+when that provider is enabled, chat messages and included context are sent
+to DeepSeek for inference. Do not submit sensitive information unless you
+have reviewed the provider’s current privacy and data-retention terms.
+Optional image generation uses an Audora-controlled local Diffusers checkpoint
+and does not call a hosted image API.
 
 ## Run the workspace
 
@@ -13,10 +17,12 @@ cp .env.example .env
 npm start
 ```
 
-The Node.js app expects a local OpenAI-compatible inference endpoint. The
-default is `http://127.0.0.1:8000/v1/chat/completions`. If no model server is
-running, chat reports a configuration error rather than falling back to an
-outside provider.
+The supplied `.env.example` selects DeepSeek hosted inference. To use a
+self-hosted OpenAI-compatible endpoint instead, uncomment the compatible
+provider settings in that file and set your endpoint, model ID, and server-side
+API key. Ollama is also supported. If no configured model server is reachable,
+chat reports a configuration error rather than silently falling back to another
+provider.
 
 ## Run an unquantized open-weight model
 
