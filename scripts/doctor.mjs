@@ -14,12 +14,12 @@ if (existsSync(envPath)) {
 const checks = [];
 const add = (level, title, detail) => checks.push({ level, title, detail });
 const provider = env.AUDORA_PROVIDER || "compatible";
-const model = env.AUDORA_MODEL || (provider === "ollama" ? "qwen3:8b" : "audora-local");
-const apiUrl = provider === "ollama" ? (env.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat") : (env.AUDORA_API_URL || "http://127.0.0.1:8000/v1/chat/completions");
+const model = env.AUDORA_MODEL || (provider === "ollama" ? "qwen3:8b" : provider === "deepseek" ? "deepseek-flash" : "audora-local");
+const apiUrl = provider === "ollama" ? (env.AUDORA_OLLAMA_URL || "http://127.0.0.1:11434/api/chat") : provider === "deepseek" ? (env.AUDORA_API_URL || "https://api.deepseek.com/chat/completions") : (env.AUDORA_API_URL || "http://127.0.0.1:8000/v1/chat/completions");
 const key = env.AUDORA_API_KEY || "";
 
 add(existsSync(envPath) ? "ok" : "warn", ".env file", existsSync(envPath) ? "Found local environment file." : "Not found. Copy .env.example to .env before starting a model-backed workspace.");
-add(["compatible", "ollama"].includes(provider) ? "ok" : "error", "Provider", `Configured provider: ${provider}`);
+add(["compatible", "ollama", "deepseek"].includes(provider) ? "ok" : "error", "Provider", `Configured provider: ${provider}`);
 add(model.trim() ? "ok" : "error", "Model ID", model || "No model ID configured.");
 add(provider === "ollama" || key.length >= 32 ? "ok" : "warn", "Inference API key", provider === "ollama" ? "Ollama mode does not use the compatible-provider API key." : key.length >= 32 ? "A 32+ character key is configured." : "Set a strong 32+ character server-side key. Do not put it in browser code.");
 try {
