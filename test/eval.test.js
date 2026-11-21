@@ -35,3 +35,10 @@ test("fails citation coverage when a required citation is missing", () => {
   assert.equal(report.citationCoverage, 0);
   assert.equal(report.details[1].pass, false);
 });
+
+test("requires every expected phrase rather than passing on one match", () => {
+  const multiPhraseCases = [{ id: "multi", prompt: "Limits?", expected_contains: ["5 MB", "20 pages", "10,000"], requires_citation: false }];
+  const report = scoreResults(multiPhraseCases, [{ id: "multi", answer: "The limit is 5 MB and 20 pages." }]);
+  assert.equal(report.keyphrasePassRate, 0);
+  assert.equal(report.details[0].pass, false);
+});
