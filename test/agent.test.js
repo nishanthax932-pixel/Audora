@@ -32,11 +32,12 @@ test("agent loop runs tool calls then returns a final answer", async () => {
     messages: [{ role: "system", content: "system" }, { role: "user", content: "Calculate 2 + 2" }],
     callModel: async (messages, options) => {
       calls++;
-      if (options.tools) {
+      if (calls === 1) {
         assert.ok(options.tools.some((tool) => tool.function.name === "calculator"));
         return { content: "I will calculate.", toolCalls: [{ id: "call-1", name: "calculator", arguments: { expression: "2 + 2" } }] };
       }
-      assert.equal(messages.at(-1).role, "system");
+      assert.ok(Array.isArray(options.tools));
+      assert.equal(messages.at(-1).role, "tool");
       assert.equal(messages.at(-2).role, "tool");
       return { content: "2 + 2 = 4.", toolCalls: [] };
     }
