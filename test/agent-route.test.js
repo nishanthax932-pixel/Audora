@@ -141,6 +141,42 @@ test("Ollama agent adapter preserves thinking content and function tool messages
   } finally { globalThis.fetch = originalFetch; }
 });
 
+test("agent endpoint streams tool progress and final answer events", { concurrency: false }, async () => {
+  const originalFetch = globalThis.fetch;
+  let providerCalls = 0;
+  globalThis.fetch = async (url, options) => {
+    if (String(url) === "https://provider.invalid/chat") {
+      providerCalls++;
+      if (providerCalls === 1) {
+        return new Response(JSON.stringify({ choices: [{ message: {
+          role: "assistant",
+          content: "",
+          tool_calls: [{ id: "stream-call", type: "function", function: { name: "calculator", arguments: JSON.stringify({ expression: "40 + 2" }) } }]
+        } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+      }
+      return new Response(JSON.stringify({ choices: [{ message: { role: "assistant", content: "The result is 42." } }] }), { status: 200, headers: { "Content-Type": "application/json" } });
+    }
+    return originalFetch(url, options);
+  };
+  try {
+    await withServer({ AUDORA_PROVIDER: "compatible", AUDORA_API_URL: "https://provider.invalid/chat", AUDORA_API_KEY: "test-secret" }, async (url) => {
+      const response = await originalFetch(url + "/api/agent", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages: [{ role: "user", content: "Calculate 40 plus 2." }], stream: true })
+      });
+      assert.equal(response.status, 200);
+      assert.match(response.headers.get("content-type"), /text\/event-stream/);
+      const body = await response.text();
+      assert.match(body, /event: progress/);
+      assert.match(body, /"type":"tool_start"/);
+      assert.match(body, /"type":"tool_complete"/);
+      assert.match(body, /event: done/);
+      assert.match(body, /"message":"The result is 42\."/);
+    });
+  } finally { globalThis.fetch = originalFetch; }
+});
+
 test("agent endpoint rejects malformed conversation input before contacting the model", async () => {
   await withServer({ AUDORA_PROVIDER: "deepseek", AUDORA_API_KEY: "test-secret" }, async (url) => {
     const response = await fetch(url + "/api/agent", {
