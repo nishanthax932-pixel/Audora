@@ -38,7 +38,8 @@ test("agent loop runs tool calls then returns a final answer", async () => {
       }
       assert.ok(Array.isArray(options.tools));
       assert.equal(messages.at(-1).role, "tool");
-      assert.equal(messages.at(-2).role, "tool");
+      assert.equal(messages.at(-2).role, "assistant");
+      assert.ok(Array.isArray(messages.at(-2).tool_calls));
       return { content: "2 + 2 = 4.", toolCalls: [] };
     }
   });
