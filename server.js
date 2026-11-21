@@ -255,7 +255,7 @@ export function createApp(environment = process.env) {
   });
   app.use(express.static(path.join(dirname, "public")));
 
-  app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, searchEnabled: Boolean(settings.searchUrl), models: settings.models.map(({ id, label }) => ({ id, label })) }));
+  app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, searchEnabled: Boolean(settings.searchUrl), agentMode: "bounded-tool-loop", agentTools: createAgentTools({ webSearchEnabled: Boolean(settings.searchUrl) }).map((tool) => tool.function.name), models: settings.models.map(({ id, label }) => ({ id, label })) }));
   app.get("/api/health", (_request, response) => {
     const hostedDeployment = Boolean(environment.RENDER || environment.FLY_APP_NAME || environment.RAILWAY_ENVIRONMENT);
     const loopbackProvider = isLoopbackUrl(settings.apiUrl);
