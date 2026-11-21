@@ -31,7 +31,7 @@ export function scoreResults(cases, results) {
     const result = byId.get(item.id);
     const answer = typeof result?.answer === "string" ? result.answer : "";
     const normalized = answer.toLocaleLowerCase();
-    const keyphrasePass = item.expected_contains.some((phrase) => normalized.includes(phrase.toLocaleLowerCase()));
+    const keyphrasePass = item.expected_contains.every((phrase) => normalized.includes(phrase.toLocaleLowerCase()));
     const citations = Array.isArray(result?.citations) ? result.citations.filter((url) => typeof url === "string" && (url.startsWith("https://") || url.startsWith("http://"))) : [];
     const citationPass = !item.requires_citation || citations.length > 0;
     if (answer.trim()) answered++;
