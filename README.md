@@ -106,7 +106,7 @@ See [alternative deployment](docs/ALTERNATIVE-HOSTING.md) to run Audora and a lo
 
 See the [deployment guide](docs/DEPLOYMENT.md) for the Docker Compose GPU stack, model setup, optional services, and production security notes. Copy `.env.compose.example` to `.env` when using Compose. Run `npm run doctor` to check local configuration and reveal remaining infrastructure gaps; this check does not claim that a model or GPU is online.
 
-See the [release acceptance checklist](docs/RELEASE-CHECKLIST.md) before a public launch.
+See the [release acceptance checklist](docs/RELEASE-CHECKLIST.md) and [current data handling note](docs/PRIVACY-AND-DATA-HANDLING.md) before a public launch. The privacy document describes the starter only; hosted operators must publish their own complete privacy notice and provider disclosures.
 
 ## Tests and production
 
