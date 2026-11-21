@@ -444,12 +444,12 @@ export function createApp(environment = process.env) {
       if (wantsStream) { sendAgentEvent("done", payload); return response.end(); }
       return response.json(payload);
     } catch (error) {
-      if (aborter.signal.aborted) return response.status(504).json({ error: "The agent reached its time limit. Narrow the task or increase AUDORA_REQUEST_TIMEOUT_MS." });
-      const status = Number.isInteger(error.status) ? error.status : 502;
-      if (!error.status) console.error("Audora agent execution failed", { name: error.name, message: String(error.message || "").slice(0, 240) });
-      const safeError = aborter.signal.aborted ? "The agent reached its time limit. Narrow the task or increase AUDORA_REQUEST_TIMEOUT_MS." : (error.status ? error.message : "Audora could not complete the bounded agent request. Check the model's tool-calling support and server configuration.");
+      const safeError = aborter.signal.aborted
+        ? "The agent reached its time limit. Narrow the task or increase AUDORA_REQUEST_TIMEOUT_MS."
+        : (error.status ? error.message : "Audora could not complete the bounded agent request. Check the model's tool-calling support and server configuration.");
+      if (!error.status && !aborter.signal.aborted) console.error("Audora agent execution failed", { name: error.name, message: String(error.message || "").slice(0, 240) });
       if (wantsStream && response.headersSent) { sendAgentEvent("error", { error: safeError }); return response.end(); }
-      return response.status(status).json({ error: safeError });
+      return response.status(aborter.signal.aborted ? 504 : (Number.isInteger(error.status) ? error.status : 502)).json({ error: safeError });
     } finally {
       clearTimeout(timer);
     }
