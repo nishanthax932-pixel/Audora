@@ -247,16 +247,7 @@ export function createApp(environment = process.env) {
     const right = Buffer.from(expected);
     return left.length === right.length && timingSafeEqual(left, right);
   };
-  app.get("/api/metrics", (request, response) => {
-    if (!metricsAuthorized(request)) return response.status(settings.metricsToken ? 401 : 404).json({ error: "Metrics endpoint is unavailable." });
-    return response.json({
-      uptimeSeconds: Math.floor((Date.now() - metrics.startedAt) / 1000),
-      totalRequests: metrics.total,
-      statusCounts: metrics.status,
-      routeCounts: metrics.routes,
-      memoryBytes: process.memoryUsage().rss
-    });
-  });
+
 
   // Only trust forwarded client IP headers when deployment explicitly sits behind one trusted proxy.
   app.set("trust proxy", environment.AUDORA_TRUST_PROXY === "1" ? 1 : false);
@@ -299,6 +290,17 @@ export function createApp(environment = process.env) {
     next();
   });
   app.use(express.static(path.join(dirname, "public")));
+
+  app.get("/api/metrics", (request, response) => {
+    if (!metricsAuthorized(request)) return response.status(settings.metricsToken ? 401 : 404).json({ error: "Metrics endpoint is unavailable." });
+    return response.json({
+      uptimeSeconds: Math.floor((Date.now() - metrics.startedAt) / 1000),
+      totalRequests: metrics.total,
+      statusCounts: metrics.status,
+      routeCounts: metrics.routes,
+      memoryBytes: process.memoryUsage().rss
+    });
+  })
 
   app.get("/api/config", (_request, response) => response.json({ brandName: settings.brandName, tagline: settings.tagline, accentColor: settings.accentColor, welcomeMessage: settings.welcomeMessage, searchEnabled: Boolean(settings.searchUrl), agentMode: "bounded-tool-loop", agentTools: createAgentTools({ webSearchEnabled: Boolean(settings.searchUrl) }).map((tool) => tool.function.name), models: settings.models.map(({ id, label }) => ({ id, label })) }));
   app.get("/api/health", (_request, response) => {
