@@ -368,7 +368,7 @@ async function sendMessage(content, { appendUser = true } = {}) {
       signal: controller.signal,
       // The API accepts at most 40 context messages. Keep the longer local
       // transcript for history, but send only the newest supported context.
-      body: JSON.stringify({ messages: (() => { const context = chat.messages.slice(-40).map((message) => ({ ...message })); const lastUser = [...context].reverse().find((message) => message.role === "user"); if (lastUser && imagesForRequest.length) lastUser.content = [{ type: "text", text: lastUser.content }, ...imagesForRequest.map((file) => ({ type: "image_url", image_url: { url: file.data } }))]; return context; })(), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode || useAgentMode, searchContext, stream: !useAgentMode })
+      body: JSON.stringify({ messages: (() => { const context = chat.messages.slice(-40).map((message) => ({ ...message })); const lastUser = [...context].reverse().find((message) => message.role === "user"); if (lastUser && imagesForRequest.length) lastUser.content = [{ type: "text", text: lastUser.content }, ...imagesForRequest.map((file) => ({ type: "image_url", image_url: { url: file.data } }))]; return context; })(), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode || useAgentMode, searchContext, stream: true })
     });
     if (!response.ok) {
       const failure = await response.json().catch(() => ({}));
@@ -376,7 +376,7 @@ async function sendMessage(content, { appendUser = true } = {}) {
     }
     let answer = "";
     let agentMeta = null;
-    if (!useAgentMode && response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
+    if (response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -391,7 +391,10 @@ async function sendMessage(content, { appendUser = true } = {}) {
           if (!dataLine) continue;
           let event;
           try { event = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
-          if (eventText.includes("event: delta") && typeof event.text === "string") {
+          if (eventText.includes("event: progress")) {
+            if (event.type === "tool_start") pending.text.textContent = `Using ${event.name}…`;
+            else if (event.type === "tool_complete") pending.text.textContent = `${event.ok ? "Completed" : "Checked"} ${event.name}. Preparing answer…`;
+          } else if (eventText.includes("event: delta") && typeof event.text === "string") {
             answer += event.text;
             pending.text.textContent = answer;
             conversationView.scrollTop = conversationView.scrollHeight;
@@ -399,6 +402,7 @@ async function sendMessage(content, { appendUser = true } = {}) {
             throw new Error(event.error || "The model stream failed.");
           } else if (eventText.includes("event: done") && typeof event.message === "string") {
             answer = event.message;
+            if (useAgentMode) agentMeta = event;
           }
         }
       }
