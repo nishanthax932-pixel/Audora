@@ -156,7 +156,7 @@ export async function executeAgentTool(name, rawArguments, { search } = {}) {
   }
 }
 
-export async function runAgentLoop({ messages, callModel, search, webSearchEnabled = false, maxSteps = 4, maxToolCalls = 8 }) {
+export async function runAgentLoop({ messages, callModel, search, webSearchEnabled = false, maxSteps = 4, maxToolCalls = 8, onProgress }) {
   if (!Array.isArray(messages) || typeof callModel !== "function") throw new Error("Agent requires messages and a model adapter.");
   const stepsLimit = Math.max(1, Math.min(Number.isInteger(maxSteps) ? maxSteps : 4, 6));
   const callsLimit = Math.max(1, Math.min(Number.isInteger(maxToolCalls) ? maxToolCalls : 8, 8));
@@ -188,8 +188,11 @@ export async function runAgentLoop({ messages, callModel, search, webSearchEnabl
     history.push({ role: "assistant", content: content || null, ...(typeof completion.reasoningContent === "string" ? { reasoning_content: completion.reasoningContent.slice(0, 20000) } : {}), tool_calls: normalizedCalls });
 
     for (const call of normalizedCalls) {
+      const toolName = call.function.name || "unknown";
+      if (typeof onProgress === "function") await onProgress({ type: "tool_start", name: toolName });
       const result = await executeAgentTool(call.function.name, call.function.arguments, { search });
-      executed.push({ name: call.function.name || "unknown", ok: result.ok === true });
+      executed.push({ name: toolName, ok: result.ok === true });
+      if (typeof onProgress === "function") await onProgress({ type: "tool_complete", name: toolName, ok: result.ok === true });
       history.push({
         role: "tool",
         tool_call_id: call.id,
