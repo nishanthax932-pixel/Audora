@@ -59,7 +59,7 @@ The image service is a separate optional Python/CUDA process. Follow [image engi
 - Keep inference and image-generation ports private; only the HTTPS gateway should be public.
 - Terminate TLS at a trusted reverse proxy. Configure `AUDORA_TRUST_PROXY=1` only when exactly one trusted proxy is in front of the Node app.
 - The built-in rate limiter is process-local. Use a shared limiter/store for multiple replicas.
-- The current chat/profile store is browser local storage. It is not a cloud account system and does not provide cross-device sync or server-side backups.
+- Agent mode is an allow-listed, bounded tool loop (calculator, UTC clock, and optional configured SearXNG search). It is not arbitrary code execution; use a separately hardened sandbox before offering code execution to users. Set `AUDORA_AGENT_MAX_STEPS` to 1–6 (default 4).\n- The current chat/profile store is browser local storage. It is not a cloud account system and does not provide cross-device sync or server-side backups.
 - Add authentication and authorization before multi-user exposure. Do not treat the optional profile email field as login.
 - Configure request-size limits, provider spend/compute limits, monitoring, log retention, backups, and an incident-response contact.
 - Keep model files and user data out of public Git history.
