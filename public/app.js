@@ -16,8 +16,10 @@ const PROFILE_KEY = "audora-profile-v1";
 const fileInput = document.querySelector("#file-input");
 const thinkingModeButton = document.querySelector("#thinking-mode");
 const searchModeButton = document.querySelector("#search-mode");
+const agentModeButton = document.querySelector("#agent-mode");
 let thinkingMode = false;
 let searchMode = false;
+let agentMode = false;
 const attachmentList = document.querySelector("#attachment-list");
 let attachments = [];
 let imageAttachments = [];
@@ -327,6 +329,7 @@ function stopGeneration() {
 async function sendMessage(content, { appendUser = true } = {}) {
   const chat = currentChat();
   if (!chat || isGenerating || (!content.trim() && !attachments.length && !imageAttachments.length)) return;
+  const useAgentMode = agentMode;
   chat.model = modelSelect.value;
   const fileContext = attachments.map((file) => `\n\n[Attached file: ${file.name}]\n${file.content}`).join("");
   const imageContext = imageAttachments.map((file) => `\n[Attached image: ${file.name}]`).join("");
@@ -350,7 +353,7 @@ async function sendMessage(content, { appendUser = true } = {}) {
 
   try {
     let searchContext = "";
-    if (searchMode) {
+    if (searchMode && !useAgentMode) {
       pending.text.textContent = "Searching the web…";
       const searchResponse = await fetch(apiUrl(`/api/search?q=${encodeURIComponent(content.trim())}`), { signal: controller.signal });
       const searchPayload = await searchResponse.json().catch(() => ({}));
@@ -359,20 +362,21 @@ async function sendMessage(content, { appendUser = true } = {}) {
       searchContext = searchPayload.results.map((item, index) => `[Source ${index + 1}] ${item.title}\nURL: ${item.url}\nSnippet: ${item.content}`).join("\n\n");
       pending.text.textContent = "Reading sources and preparing an answer…";
     }
-    const response = await fetch(apiUrl("/api/chat"), {
+    const response = await fetch(apiUrl(useAgentMode ? "/api/agent" : "/api/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       // The API accepts at most 40 context messages. Keep the longer local
       // transcript for history, but send only the newest supported context.
-      body: JSON.stringify({ messages: (() => { const context = chat.messages.slice(-40).map((message) => ({ ...message })); const lastUser = [...context].reverse().find((message) => message.role === "user"); if (lastUser && imagesForRequest.length) lastUser.content = [{ type: "text", text: lastUser.content }, ...imagesForRequest.map((file) => ({ type: "image_url", image_url: { url: file.data } }))]; return context; })(), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode, searchContext, stream: true })
+      body: JSON.stringify({ messages: (() => { const context = chat.messages.slice(-40).map((message) => ({ ...message })); const lastUser = [...context].reverse().find((message) => message.role === "user"); if (lastUser && imagesForRequest.length) lastUser.content = [{ type: "text", text: lastUser.content }, ...imagesForRequest.map((file) => ({ type: "image_url", image_url: { url: file.data } }))]; return context; })(), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode || useAgentMode, searchContext, stream: !useAgentMode })
     });
     if (!response.ok) {
       const failure = await response.json().catch(() => ({}));
       throw new Error(failure.error || `Audora request failed (${response.status}).`);
     }
     let answer = "";
-    if (response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
+    let agentMeta = null;
+    if (!useAgentMode && response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
@@ -401,6 +405,7 @@ async function sendMessage(content, { appendUser = true } = {}) {
     } else {
       const result = await response.json().catch(() => ({}));
       if (typeof result.message === "string") answer = result.message;
+      if (useAgentMode) agentMeta = result;
     }
     if (!answer.trim()) throw new Error("The model returned an empty response.");
     const assistantMessage = { role: "assistant", content: answer };
@@ -412,6 +417,10 @@ async function sendMessage(content, { appendUser = true } = {}) {
     // Replace the pending row so the copy action is available.
     pending.article.remove();
     renderMessage("assistant", answer);
+    if (useAgentMode && Array.isArray(agentMeta?.toolCalls) && agentMeta.toolCalls.length) {
+      const names = [...new Set(agentMeta.toolCalls.map((item) => item.name))].join(", ");
+      showNotice(`Agent completed ${agentMeta.steps} tool step(s): ${names}.`);
+    }
   } catch (error) {
     const message = error.name === "AbortError" ? "Generation stopped." : error.message;
     pending.text.textContent = message;
@@ -569,6 +578,16 @@ searchModeButton?.addEventListener("click", () => {
   searchModeButton.classList.toggle("active", searchMode);
   searchModeButton.title = searchMode ? "Web search is on for the next answer" : "Search the web before answering";
   showNotice(searchMode ? "Web search enabled: Audora will retrieve live results and use source links." : "Web search disabled.");
+});
+
+agentModeButton?.addEventListener("click", () => {
+  agentMode = !agentMode;
+  agentModeButton.setAttribute("aria-pressed", String(agentMode));
+  agentModeButton.classList.toggle("active", agentMode);
+  agentModeButton.title = agentMode ? "Agent mode is on: bounded multi-step tool use" : "Agent mode: bounded tool use";
+  showNotice(agentMode
+    ? "Agent mode enabled: Audora can choose calculator, current time, and configured web search. It cannot run shell commands or arbitrary code."
+    : "Agent mode disabled. Standard chat is active.");
 });
 thinkingModeButton.addEventListener("click", () => {
   thinkingMode = !thinkingMode;
