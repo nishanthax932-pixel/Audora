@@ -345,7 +345,7 @@ async function sendMessage(content, { appendUser = true } = {}) {
   safeSave();
   renderHistory();
   if (appendUser) renderMessage("user", fullContent);
-  const pending = renderMessage("assistant", "Thinking…", { pending: true });
+  const pending = renderMessage("assistant", useAgentMode ? "Planning the task and selecting safe tools…" : "Thinking…", { pending: true });
   promptInput.value = "";
   promptInput.style.height = "auto";
   controller = new AbortController();
