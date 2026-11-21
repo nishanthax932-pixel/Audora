@@ -23,3 +23,14 @@ disclosure.
 - The included in-memory rate limiter is not a shared production limiter.
 - Configure authentication, durable storage, monitoring, and provider spend
   limits before exposing a multi-user production service.
+
+
+## Operational metrics
+
+The server supports an optional aggregate metrics endpoint at `GET /api/metrics`. Enable it only by setting `AUDORA_METRICS_TOKEN` to a long random secret in the server environment. Send it as a bearer token:
+
+```http
+Authorization: Bearer YOUR_METRICS_TOKEN
+```
+
+The endpoint returns process uptime, aggregate request/status counts, a bounded set of route counters and process RSS memory. It does not expose prompts, user content, API keys, IP addresses, or user identifiers. Metrics are in-memory and reset on process restart; they are not a replacement for durable telemetry, alerting, distributed tracing, or multi-instance aggregation. If the token is not configured, the endpoint returns 404. Keep the token out of browser code and public logs.
