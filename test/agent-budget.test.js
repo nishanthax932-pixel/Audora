@@ -60,6 +60,8 @@ test("agent normalizes duplicate provider tool-call IDs before building tool his
   let call = 0;
   const result = await runAgentLoop({
     messages: [{ role: "user", content: "Calculate two values." }],
+    maxSteps: 1,
+    maxToolCalls: 2,
     callModel: async (history, options) => {
       call++;
       if (options.tools) {
