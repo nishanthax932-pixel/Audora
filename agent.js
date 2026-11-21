@@ -182,7 +182,7 @@ export async function runAgentLoop({ messages, callModel, search, webSearchEnabl
       let argumentsText = typeof rawArgs === "string" ? rawArgs : safeJson(rawArgs && typeof rawArgs === "object" ? rawArgs : {});
       return { id, type: "function", function: { name, arguments: argumentsText } };
     });
-    history.push({ role: "assistant", content: content || null, tool_calls: normalizedCalls });
+    history.push({ role: "assistant", content: content || null, ...(typeof completion.reasoningContent === "string" ? { reasoning_content: completion.reasoningContent.slice(0, 20000) } : {}), tool_calls: normalizedCalls });
 
     for (const call of normalizedCalls) {
       const result = await executeAgentTool(call.function.name, call.function.arguments, { search });
