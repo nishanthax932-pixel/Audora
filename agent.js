@@ -164,6 +164,7 @@ export async function runAgentLoop({ messages, callModel, search, webSearchEnabl
   const history = messages.map((message) => ({ ...message }));
   const executed = [];
   let steps = 0;
+  const usedCallIds = new Set();
 
   while (steps < stepsLimit && executed.length < callsLimit) {
     const completion = await callModel(history, { tools, toolChoice: "auto" });
@@ -176,7 +177,9 @@ export async function runAgentLoop({ messages, callModel, search, webSearchEnabl
     const remaining = callsLimit - executed.length;
     const selected = calls.slice(0, remaining);
     const normalizedCalls = selected.map((call, index) => {
-      const id = typeof call?.id === "string" && call.id.length <= 120 ? call.id : `audora_${steps + 1}_${index + 1}`;
+      const proposedId = typeof call?.id === "string" && call.id.length <= 120 ? call.id : `audora_${steps + 1}_${index + 1}`;
+      const id = usedCallIds.has(proposedId) ? `audora_${steps + 1}_${index + 1}_${usedCallIds.size + 1}` : proposedId;
+      usedCallIds.add(id);
       const name = typeof call?.name === "string" ? call.name : "";
       const rawArgs = call?.arguments;
       let argumentsText = typeof rawArgs === "string" ? rawArgs : safeJson(rawArgs && typeof rawArgs === "object" ? rawArgs : {});
