@@ -395,6 +395,7 @@ export function createApp(environment = process.env) {
               model: selectedModel.id,
               messages: modelMessages,
               temperature: 0.4,
+              reasoning_effort: "high",
               stream: false,
               ...(includeTools ? { tools: options.tools, tool_choice: options.toolChoice || "auto" } : {}),
               ...(settings.provider === "deepseek" ? { thinking: { type: "enabled" }, safety_check: { level: "high" } } : {})
@@ -412,6 +413,7 @@ export function createApp(environment = process.env) {
         const rawCalls = Array.isArray(assistant.tool_calls) ? assistant.tool_calls : [];
         return {
           content: typeof assistant.content === "string" ? assistant.content : "",
+          reasoningContent: typeof assistant.reasoning_content === "string" ? assistant.reasoning_content : (typeof assistant.thinking === "string" ? assistant.thinking : ""),
           toolCalls: rawCalls.slice(0, 8).map((call, index) => ({
             id: typeof call.id === "string" ? call.id : `ollama_${Date.now()}_${index}`,
             name: typeof call.function?.name === "string" ? call.function.name : "",
