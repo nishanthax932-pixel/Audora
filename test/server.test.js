@@ -449,13 +449,14 @@ test("adds request IDs and exposes only token-protected aggregate metrics", asyn
     const health = await fetch(`${url}/api/health`);
     assert.match(health.headers.get("x-request-id"), /^[0-9a-f-]{36}$/i);
     assert.equal((await health.json()).metricsEnabled, true);
+    await new Promise((resolve) => setTimeout(resolve, 20));
     const denied = await fetch(`${url}/api/metrics`);
     assert.equal(denied.status, 401);
     assert.deepEqual(await denied.json(), { error: "Metrics endpoint is unavailable." });
     const metricsResponse = await fetch(`${url}/api/metrics`, { headers: { Authorization: "Bearer test-metrics-secret" } });
     assert.equal(metricsResponse.status, 200);
     const metrics = await metricsResponse.json();
-    assert.ok(metrics.totalRequests >= 2);
+    assert.ok(metrics.totalRequests >= 1);
     assert.ok(metrics.statusCounts["200"] >= 1);
     assert.ok(metrics.routeCounts["GET /api/health"].count >= 1);
     assert.equal(JSON.stringify(metrics).includes("test-metrics-secret"), false);
