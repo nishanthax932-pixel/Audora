@@ -443,3 +443,28 @@ test("accepts image-only user messages for vision-capable providers", { concurre
     });
   } finally { globalThis.fetch = originalFetch; }
 });
+
+test("adds request IDs and exposes only token-protected aggregate metrics", async () => {
+  await withServer({ AUDORA_METRICS_TOKEN: "test-metrics-secret" }, async (url) => {
+    const health = await fetch(`${url}/api/health`);
+    assert.match(health.headers.get("x-request-id"), /^[0-9a-f-]{36}$/i);
+    assert.equal((await health.json()).metricsEnabled, true);
+    const denied = await fetch(`${url}/api/metrics`);
+    assert.equal(denied.status, 401);
+    assert.deepEqual(await denied.json(), { error: "Metrics endpoint is unavailable." });
+    const metricsResponse = await fetch(`${url}/api/metrics`, { headers: { Authorization: "Bearer test-metrics-secret" } });
+    assert.equal(metricsResponse.status, 200);
+    const metrics = await metricsResponse.json();
+    assert.ok(metrics.totalRequests >= 2);
+    assert.ok(metrics.statusCounts["200"] >= 1);
+    assert.ok(metrics.routeCounts["GET /api/health"].count >= 1);
+    assert.equal(JSON.stringify(metrics).includes("test-metrics-secret"), false);
+  });
+});
+
+test("hides metrics endpoint when no metrics token is configured", async () => {
+  await withServer({}, async (url) => {
+    const response = await fetch(`${url}/api/metrics`);
+    assert.equal(response.status, 404);
+  });
+});
