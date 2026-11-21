@@ -19,7 +19,7 @@ export function validateDataset(cases) {
 
 export function scoreResults(cases, results) {
   const errors = validateDataset(cases);
-  if (errors.length) throw new Error(errors.join("\\n"));
+  if (errors.length) throw new Error(errors.join("\n"));
   if (!Array.isArray(results)) throw new Error("Results must be a JSON array.");
   const byId = new Map();
   for (const result of results) {
@@ -32,7 +32,7 @@ export function scoreResults(cases, results) {
     const answer = typeof result?.answer === "string" ? result.answer : "";
     const normalized = answer.toLocaleLowerCase();
     const keyphrasePass = item.expected_contains.some((phrase) => normalized.includes(phrase.toLocaleLowerCase()));
-    const citations = Array.isArray(result?.citations) ? result.citations.filter((url) => typeof url === "string" && /^https?:\\/\\//i.test(url)) : [];
+    const citations = Array.isArray(result?.citations) ? result.citations.filter((url) => typeof url === "string" && (url.startsWith("https://") || url.startsWith("http://"))) : [];
     const citationPass = !item.requires_citation || citations.length > 0;
     if (answer.trim()) answered++;
     if (keyphrasePass) keyphrasePasses++;
@@ -55,7 +55,7 @@ function main() {
   const datasetPath = args[args.indexOf("--dataset") + 1] || "evals/golden-set.json";
   const cases = readJson(datasetPath);
   const errors = validateDataset(cases);
-  if (errors.length) { console.error(errors.join("\\n")); process.exitCode = 1; return; }
+  if (errors.length) { console.error(errors.join("\n")); process.exitCode = 1; return; }
   if (args.includes("--validate") || !args.includes("--results")) {
     console.log(JSON.stringify({ valid: true, cases: cases.length, categories: [...new Set(cases.map((item) => item.category))].length }, null, 2));
     return;
