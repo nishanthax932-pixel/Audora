@@ -52,7 +52,8 @@ export function scoreResults(cases, results) {
 function readJson(path) { return JSON.parse(fs.readFileSync(path, "utf8")); }
 function main() {
   const args = process.argv.slice(2);
-  const datasetPath = args[args.indexOf("--dataset") + 1] || "evals/golden-set.json";
+  const datasetIndex = args.indexOf("--dataset");
+  const datasetPath = datasetIndex >= 0 && args[datasetIndex + 1] ? args[datasetIndex + 1] : "evals/golden-set.json";
   const cases = readJson(datasetPath);
   const errors = validateDataset(cases);
   if (errors.length) { console.error(errors.join("\n")); process.exitCode = 1; return; }
@@ -60,7 +61,9 @@ function main() {
     console.log(JSON.stringify({ valid: true, cases: cases.length, categories: [...new Set(cases.map((item) => item.category))].length }, null, 2));
     return;
   }
-  const resultsPath = args[args.indexOf("--results") + 1];
+  const resultsIndex = args.indexOf("--results");
+  const resultsPath = resultsIndex >= 0 ? args[resultsIndex + 1] : null;
+  if (!resultsPath || resultsPath.startsWith("--")) { console.error("Provide a JSON file path after --results."); process.exitCode = 1; return; }
   const report = scoreResults(cases, readJson(resultsPath));
   console.log(JSON.stringify(report, null, 2));
   if (report.details.some((item) => !item.pass)) process.exitCode = 1;
