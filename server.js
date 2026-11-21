@@ -194,6 +194,7 @@ function toOllamaMessages(messages) {
       return {
         role: "assistant",
         content: typeof message.content === "string" ? message.content : "",
+        ...(typeof message.reasoning_content === "string" ? { thinking: message.reasoning_content } : {}),
         tool_calls: message.tool_calls.map((call) => {
           let args = {};
           try { args = typeof call.function?.arguments === "string" ? JSON.parse(call.function.arguments || "{}") : (call.function?.arguments || {}); } catch { args = {}; }
