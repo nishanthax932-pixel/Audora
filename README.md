@@ -132,7 +132,7 @@ model setup, optional services, and production security notes. Copy
 to check local configuration and reveal remaining infrastructure gaps; this
 check does not claim that a model or GPU is online.
 
-See the [release acceptance checklist](docs/RELEASE-CHECKLIST.md), [security guidance](SECURITY.md),
+See the [foundation-model and intelligence roadmap](docs/FOUNDATION-MODEL-STRATEGY.md) and [model training guide](training/README.md) for the staged model strategy, data governance, fine-tuning workflow, and research gates. See the [release acceptance checklist](docs/RELEASE-CHECKLIST.md), [security guidance](SECURITY.md),
 [current data handling note](docs/PRIVACY-AND-DATA-HANDLING.md), and
 [production operations runbook](docs/PRODUCTION-OPERATIONS-RUNBOOK.md) before
 a public launch. The privacy document describes the starter only; hosted
