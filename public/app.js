@@ -643,17 +643,20 @@ fileInput.addEventListener("change", async () => {
 });
 
 document.querySelector("#export-chats").addEventListener("click", () => {
-  if (!chats.length) {
-    showNotice("There are no conversations to export yet.");
-    return;
-  }
-  const payload = JSON.stringify({ exportedAt: new Date().toISOString(), format: "audora-local-chats-v1", conversations: chats }, null, 2);
+  const payload = JSON.stringify({
+    exportedAt: new Date().toISOString(),
+    format: "audora-local-data-v2",
+    conversations: chats,
+    profile,
+    theme: document.documentElement.classList.contains("light") ? "light" : "dark"
+  }, null, 2);
   const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = `audora-chats-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `audora-local-data-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showNotice("Exported your local conversations, profile, and theme. Keep this backup somewhere private.");
 });
 
 document.querySelector("#import-chats")?.addEventListener("click", () => document.querySelector("#import-file-input")?.click());
