@@ -8,7 +8,7 @@ Audora can be self-hosted or operated with external model/search providers. The 
 
 - Conversation history and profile fields are stored in the user's browser using local storage. The profile includes display name, optional email, and optional memory text.
 - These browser records do not automatically sync between devices. The starter does not currently implement accounts, password recovery, a hosted conversation database, or a central user profile.
-- The browser app has controls to delete individual conversations, export chats to JSON, and import a previous JSON backup. Browser site-data clearing can also remove local history and profile data.
+- The browser app has controls to delete individual conversations, export all local data (conversations, profile fields, and theme) to JSON, and import conversation history from a previous JSON backup. The export file contains personal profile information when present and should be kept private. Browser site-data clearing can also remove local history and profile data.
 - The optional profile email is stored in that browser profile. The current chat request sends profile memory, not the profile name or email.
 
 ## What leaves the browser
@@ -29,7 +29,7 @@ The application does not intentionally log full prompts or attachments. It logs 
 
 ## Retention and deletion
 
-- Users can delete chats in the browser UI, export conversations, and clear the site's browser data. These actions affect the local browser copy.
+- Users can delete chats in the browser UI, export conversations and profile fields, and clear the site's browser data. These actions affect the local browser copy; exporting creates a separate JSON file that the user must protect.
 - There is currently no account-wide deletion endpoint, central cloud history, or deletion workflow for third-party model/search provider copies.
 - If data has already been sent to a hosted model or search provider, deletion requests must be handled under that provider's current terms and controls. Audora cannot promise deletion from infrastructure it does not control.
 - Operators should set and publish retention periods for application logs, backups, provider records, and search infrastructure before public launch.
