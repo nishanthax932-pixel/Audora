@@ -6,7 +6,7 @@ This roadmap tracks gaps between the current open-source starter and a secure, r
 
 Audora should **not train a foundation model from scratch at this stage**. Continue using hosted or open-weight models behind the existing provider abstraction. Consider fine-tuning/LoRA only if held-out evaluations show measurable product-specific benefit, with licensed data and affordable compute.
 
-## Delivery order
+See [Foundation Model & Intelligence Strategy](FOUNDATION-MODEL-STRATEGY.md) for the model gateway, data governance, fine-tuning, pretraining research, and release gates. The governed semantic evaluation/provenance pipeline is tracked in [issue #43](https://github.com/nishanthax932-pixel/Audora/issues/43).\n\n## Delivery order
 
 ### P0 — Trust and quality
 1. Golden-set evaluation harness
