@@ -6,11 +6,24 @@ import argparse
 import hashlib
 import json
 import sys
+import unicodedata
 from pathlib import Path
 
 ROLES = {"system", "user", "assistant"}
 SPLITS = {"train", "validation", "test"}
 REVIEW_STATES = {"approved", "rejected", "pending"}
+
+
+def normalized_conversation(messages: list[dict[str, str]]) -> str:
+    """Canonicalize harmless Unicode, case, and whitespace differences for leakage checks."""
+    normalized = [
+        {
+            "role": message["role"],
+            "content": " ".join(unicodedata.normalize("NFKC", message["content"]).casefold().split()),
+        }
+        for message in messages
+    ]
+    return json.dumps(normalized, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
 
 
 def validate_records(records: list[object]) -> list[str]:
@@ -25,31 +38,40 @@ def validate_records(records: list[object]) -> list[str]:
         if not isinstance(record, dict):
             errors.append(f"{where}: expected a JSON object.")
             continue
+
         required = ("id", "source", "license", "split", "language", "review_status")
         for field in required:
             if not isinstance(record.get(field), str) or not record[field].strip():
                 errors.append(f"{where}: {field} must be a non-empty string.")
+
         record_id = record.get("id")
         if isinstance(record_id, str) and record_id.strip():
             if record_id in seen_ids:
                 errors.append(f"{where}: duplicate id {record_id!r}.")
             seen_ids.add(record_id)
 
-        if not isinstance(record.get("split"), str) or record.get("split") not in SPLITS:
+        split = record.get("split")
+        if not isinstance(split, str) or split not in SPLITS:
             errors.append(f"{where}: split must be one of {sorted(SPLITS)}.")
-        if not isinstance(record.get("review_status"), str) or record.get("review_status") not in REVIEW_STATES:
+        review_status = record.get("review_status")
+        if not isinstance(review_status, str) or review_status not in REVIEW_STATES:
             errors.append(f"{where}: review_status must be one of {sorted(REVIEW_STATES)}.")
-        if record.get("review_status") != "approved":
+        if review_status != "approved":
             errors.append(f"{where}: only approved records may enter a training/evaluation manifest.")
 
         messages = record.get("messages")
         if not isinstance(messages, list) or len(messages) < 2:
             errors.append(f"{where}: messages must contain at least two turns.")
             continue
+
         valid_messages = True
         for turn in messages:
-            if (not isinstance(turn, dict) or turn.get("role") not in ROLES
-                    or not isinstance(turn.get("content"), str) or not turn["content"].strip()):
+            if (
+                not isinstance(turn, dict)
+                or turn.get("role") not in ROLES
+                or not isinstance(turn.get("content"), str)
+                or not turn["content"].strip()
+            ):
                 valid_messages = False
                 break
         if not valid_messages:
@@ -59,20 +81,20 @@ def validate_records(records: list[object]) -> list[str]:
             errors.append(f"{where}: the final message must be an assistant response.")
             continue
 
-        canonical = json.dumps(messages, ensure_ascii=False, sort_keys=True, separators=(",", ":"))
+        canonical = normalized_conversation(messages)
         digest = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
-        split = record.get("split")
-        if isinstance(split, str):
+        if isinstance(split, str) and split in SPLITS:
             previous = content_splits.get(digest)
             if previous and previous[0] != split:
                 errors.append(
-                    f"{where}: exact conversation duplicate crosses {previous[0]} line "
-                    f"{previous[1]} and {split} split."
+                    f"{where}: normalized exact conversation duplicate crosses {previous[0]} "
+                    f"line {previous[1]} and {split} split."
                 )
             elif previous:
-                errors.append(f"{where}: exact duplicate conversation of line {previous[1]}.")
+                errors.append(f"{where}: normalized exact duplicate conversation of line {previous[1]}.")
             else:
                 content_splits[digest] = (split, index)
+
     return errors
 
 
@@ -101,8 +123,8 @@ def main() -> int:
     if errors:
         print("\n".join(errors), file=sys.stderr)
         return 1
-    print("Dataset manifest valid: provenance fields, approved review status, message shape, IDs, and exact split leakage checks passed.")
-    print("Note: this validator does not verify external license claims, remove PII, or detect near-duplicates.")
+    print("Dataset manifest valid: provenance fields, approved review status, message shape, IDs, and normalized exact split leakage checks passed.")
+    print("Note: this validator does not verify external license claims, remove PII, or detect semantic/near-duplicate records.")
     return 0
 
 
