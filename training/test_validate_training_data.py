@@ -3,7 +3,7 @@ import unittest
 from validate_training_data import validate_records
 
 
-def row(record_id="a", split="train", content="Answer"):
+def row(record_id="a", split="train", content="Answer", question="Question"):
     return {
         "id": record_id,
         "source": "curated-example",
@@ -12,7 +12,7 @@ def row(record_id="a", split="train", content="Answer"):
         "language": "en",
         "review_status": "approved",
         "messages": [
-            {"role": "user", "content": "Question"},
+            {"role": "user", "content": question},
             {"role": "assistant", "content": content},
         ],
     }
@@ -38,6 +38,15 @@ class TrainingDataValidationTests(unittest.TestCase):
         errors = validate_records([row("train", "train"), row("test", "test")])
         self.assertTrue(any("crosses train" in error for error in errors))
 
+    def test_rejects_normalized_duplicate_across_splits(self):
+        first = row("train", "train", content="The Answer", question="What is this?")
+        second = row("test", "test", content=" THE   ANSWER ", question="WHAT IS THIS?")
+        errors = validate_records([first, second])
+        self.assertTrue(any("normalized exact conversation duplicate crosses train" in error for error in errors))
+
+    def test_allows_different_conversations(self):
+        self.assertEqual(validate_records([row("one"), row("two", content="Another answer")]), [])
+
     def test_rejects_non_assistant_final_turn(self):
         item = row()
         item["messages"][-1]["role"] = "user"
@@ -45,7 +54,7 @@ class TrainingDataValidationTests(unittest.TestCase):
 
     def test_rejects_invalid_split(self):
         self.assertTrue(any("split must" in error for error in validate_records([row(split="holdout")])))
-        
+
 
 if __name__ == "__main__":
     unittest.main()
