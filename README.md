@@ -87,37 +87,71 @@ consistency instead of exposing hidden scratchpad reasoning.
 
 Chat history and profile memory are stored in browser local storage. There is
 no account login, cross-device sync, or cloud chat database in this starter.
-Text/code attachments and safe Markdown rendering are supported. PDF and DOCX text can be extracted locally in the browser (up to 5 MB per file, 20 PDF pages, and 10,000 extracted characters); the extracted text is sent with the chat request, while the original document is not uploaded as a separate file. PDF/DOCX extraction downloads the pinned PDF.js and Mammoth libraries on first use. Conversation backups can be imported from a previous Audora JSON export. Image understanding still depends on a configured vision-capable model. Web search and source-link citations are available when SearXNG is configured; live token streaming is supported by compatible and Ollama providers. Autonomous multi-step tool execution is not yet implemented.
-Image generation has a self-hosted UI/API path; it remains disabled until a local Diffusers checkpoint, CUDA GPU, and matching server secret are configured. See `image/README.md`.
+Text/code attachments and safe Markdown rendering are supported. Agent mode can
+be enabled from the composer using the ✦ button; the server allows at most 6 tool
+rounds (4 by default) and validates all tool inputs. Its allow-listed tools are
+an arithmetic calculator and UTC clock, plus web search when SearXNG is
+configured. It cannot execute shell commands or arbitrary code, and it is not
+a replacement for an isolated coding sandbox. PDF and DOCX text can be
+extracted locally in the browser (up to 5 MB per file, 20 PDF pages, and
+10,000 extracted characters); the extracted text is sent with the chat request,
+while the original document is not uploaded as a separate file. PDF/DOCX
+extraction downloads the pinned PDF.js and Mammoth libraries on first use.
+Conversation backups can be imported from a previous Audora JSON export.
+Image understanding still depends on a configured vision-capable model. Web
+search and source-link citations are available when SearXNG is configured;
+live token streaming is supported by compatible and Ollama providers.
+Image generation has a self-hosted UI/API path; it remains disabled until a
+local Diffusers checkpoint, CUDA GPU, and matching server secret are configured.
+See `image/README.md`.
 
 ## Everyday user guide
 
-See [the everyday user guide](docs/USER-GUIDE.md) for first-time setup status, everyday workspace tools, privacy, and troubleshooting.
+See [the everyday user guide](docs/USER-GUIDE.md) for first-time setup status,
+everyday workspace tools, privacy, and troubleshooting.
 
 ## Free hosted deployment
 
-See [free hosting](docs/FREE-HOSTING.md) for a Render Free blueprint that hosts the Audora interface and API gateway with a public HTTPS URL. The model runtime, web search service, and image-generation engine remain separate services and must be configured independently. See [hosting options](docs/HOSTING-OPTIONS.md) for a practical PC + Cloudflare Tunnel setup and the Oracle Always Free CPU alternative.
+See [free hosting](docs/FREE-HOSTING.md) for a Render Free blueprint that
+hosts the Audora interface and API gateway with a public HTTPS URL. The model
+runtime, web search service, and image-generation engine remain separate
+services and must be configured independently. See [hosting options](docs/HOSTING-OPTIONS.md)
+for a practical PC + Cloudflare Tunnel setup and the Oracle Always Free CPU alternative.
 
 ## Alternative: use your own PC
 
-See [alternative deployment](docs/ALTERNATIVE-HOSTING.md) to run Audora and a local Ollama model on your own computer and expose only the web app through a temporary Cloudflare Tunnel. Your PC and internet connection must remain online.
+See [alternative deployment](docs/ALTERNATIVE-HOSTING.md) to run Audora and
+a local Ollama model on your own computer and expose only the web app through
+a temporary Cloudflare Tunnel. Your PC and internet connection must remain online.
 
 ## Deployment and configuration doctor
 
-See the [deployment guide](docs/DEPLOYMENT.md) for the Docker Compose GPU stack, model setup, optional services, and production security notes. Copy `.env.compose.example` to `.env` when using Compose. Run `npm run doctor` to check local configuration and reveal remaining infrastructure gaps; this check does not claim that a model or GPU is online.
+See the [deployment guide](docs/DEPLOYMENT.md) for the Docker Compose GPU stack,
+model setup, optional services, and production security notes. Copy
+`.env.compose.example` to `.env` when using Compose. Run `npm run doctor`
+to check local configuration and reveal remaining infrastructure gaps; this
+check does not claim that a model or GPU is online.
 
-See the [release acceptance checklist](docs/RELEASE-CHECKLIST.md) before a public launch.
+See the [identity and durable-memory design](docs/IDENTITY-AND-MEMORY-DESIGN.md) for the proposed OIDC, API authorization, PostgreSQL isolation, and explicit local-history migration gates. This is a design only; accounts and cloud memory are not enabled. See the [foundation-model and intelligence roadmap](docs/FOUNDATION-MODEL-STRATEGY.md) and [model training guide](training/README.md) for the staged model strategy, data governance, fine-tuning workflow, and research gates. See the [release acceptance checklist](docs/RELEASE-CHECKLIST.md), [security guidance](SECURITY.md),
+[current data handling note](docs/PRIVACY-AND-DATA-HANDLING.md), and
+[production operations runbook](docs/PRODUCTION-OPERATIONS-RUNBOOK.md) before
+a public launch. The privacy document describes the starter only; hosted
+operators must publish their own complete privacy notice and provider disclosures.
 
 ## Tests and production
 
 ```bash
-npm test
+npm ci
 npm run build
+npm test
+npm run eval:validate
+npm run doctor
 ```
 
-Tests mock the local inference server; they verify request construction and
-error handling, not model quality or GPU availability. A real end-to-end check
-requires the actual checkpoint and inference server.
+Tests mock inference providers; they verify request construction and error
+handling, not model quality or GPU availability. A real end-to-end check
+requires the actual checkpoint and inference server. The health endpoint
+checks configuration, not live provider readiness.
 
 Before public launch, configure identity, durable rate limiting, monitoring,
 HTTPS, access controls, backups, and infrastructure capacity. The built-in
@@ -126,5 +160,6 @@ the inference server receives the context submitted for each request.
 
 ## Audora Wiki
 
-Project documentation, setup instructions, architecture notes, known limitations, and deployment guidance:
+Project documentation, setup instructions, architecture notes, known limitations,
+and deployment guidance:
 [Open the Audora Wiki](docs/AUDORA-WIKI.md).

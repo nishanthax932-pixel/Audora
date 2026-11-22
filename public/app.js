@@ -16,8 +16,10 @@ const PROFILE_KEY = "audora-profile-v1";
 const fileInput = document.querySelector("#file-input");
 const thinkingModeButton = document.querySelector("#thinking-mode");
 const searchModeButton = document.querySelector("#search-mode");
+const agentModeButton = document.querySelector("#agent-mode");
 let thinkingMode = false;
 let searchMode = false;
+let agentMode = false;
 const attachmentList = document.querySelector("#attachment-list");
 let attachments = [];
 let imageAttachments = [];
@@ -327,6 +329,7 @@ function stopGeneration() {
 async function sendMessage(content, { appendUser = true } = {}) {
   const chat = currentChat();
   if (!chat || isGenerating || (!content.trim() && !attachments.length && !imageAttachments.length)) return;
+  const useAgentMode = agentMode;
   chat.model = modelSelect.value;
   const fileContext = attachments.map((file) => `\n\n[Attached file: ${file.name}]\n${file.content}`).join("");
   const imageContext = imageAttachments.map((file) => `\n[Attached image: ${file.name}]`).join("");
@@ -342,7 +345,7 @@ async function sendMessage(content, { appendUser = true } = {}) {
   safeSave();
   renderHistory();
   if (appendUser) renderMessage("user", fullContent);
-  const pending = renderMessage("assistant", "Thinking…", { pending: true });
+  const pending = renderMessage("assistant", useAgentMode ? "Planning the task and selecting safe tools…" : "Thinking…", { pending: true });
   promptInput.value = "";
   promptInput.style.height = "auto";
   controller = new AbortController();
@@ -350,7 +353,7 @@ async function sendMessage(content, { appendUser = true } = {}) {
 
   try {
     let searchContext = "";
-    if (searchMode) {
+    if (searchMode && !useAgentMode) {
       pending.text.textContent = "Searching the web…";
       const searchResponse = await fetch(apiUrl(`/api/search?q=${encodeURIComponent(content.trim())}`), { signal: controller.signal });
       const searchPayload = await searchResponse.json().catch(() => ({}));
@@ -359,19 +362,20 @@ async function sendMessage(content, { appendUser = true } = {}) {
       searchContext = searchPayload.results.map((item, index) => `[Source ${index + 1}] ${item.title}\nURL: ${item.url}\nSnippet: ${item.content}`).join("\n\n");
       pending.text.textContent = "Reading sources and preparing an answer…";
     }
-    const response = await fetch(apiUrl("/api/chat"), {
+    const response = await fetch(apiUrl(useAgentMode ? "/api/agent" : "/api/chat"), {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       signal: controller.signal,
       // The API accepts at most 40 context messages. Keep the longer local
       // transcript for history, but send only the newest supported context.
-      body: JSON.stringify({ messages: (() => { const context = chat.messages.slice(-40).map((message) => ({ ...message })); const lastUser = [...context].reverse().find((message) => message.role === "user"); if (lastUser && imagesForRequest.length) lastUser.content = [{ type: "text", text: lastUser.content }, ...imagesForRequest.map((file) => ({ type: "image_url", image_url: { url: file.data } }))]; return context; })(), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode, searchContext, stream: true })
+      body: JSON.stringify({ messages: (() => { const context = chat.messages.slice(-40).map((message) => ({ ...message })); const lastUser = [...context].reverse().find((message) => message.role === "user"); if (lastUser && imagesForRequest.length) lastUser.content = [{ type: "text", text: lastUser.content }, ...imagesForRequest.map((file) => ({ type: "image_url", image_url: { url: file.data } }))]; return context; })(), model: chat.model, memory: profile.memory || "", reasoning: thinkingMode || useAgentMode, searchContext, stream: true })
     });
     if (!response.ok) {
       const failure = await response.json().catch(() => ({}));
       throw new Error(failure.error || `Audora request failed (${response.status}).`);
     }
     let answer = "";
+    let agentMeta = null;
     if (response.headers.get("content-type")?.includes("text/event-stream") && response.body) {
       const reader = response.body.getReader();
       const decoder = new TextDecoder();
@@ -387,7 +391,10 @@ async function sendMessage(content, { appendUser = true } = {}) {
           if (!dataLine) continue;
           let event;
           try { event = JSON.parse(dataLine.slice(5).trim()); } catch { continue; }
-          if (eventText.includes("event: delta") && typeof event.text === "string") {
+          if (eventText.includes("event: progress")) {
+            if (event.type === "tool_start") pending.text.textContent = `Using ${event.name}…`;
+            else if (event.type === "tool_complete") pending.text.textContent = `${event.ok ? "Completed" : "Checked"} ${event.name}. Preparing answer…`;
+          } else if (eventText.includes("event: delta") && typeof event.text === "string") {
             answer += event.text;
             pending.text.textContent = answer;
             conversationView.scrollTop = conversationView.scrollHeight;
@@ -395,12 +402,14 @@ async function sendMessage(content, { appendUser = true } = {}) {
             throw new Error(event.error || "The model stream failed.");
           } else if (eventText.includes("event: done") && typeof event.message === "string") {
             answer = event.message;
+            if (useAgentMode) agentMeta = event;
           }
         }
       }
     } else {
       const result = await response.json().catch(() => ({}));
       if (typeof result.message === "string") answer = result.message;
+      if (useAgentMode) agentMeta = result;
     }
     if (!answer.trim()) throw new Error("The model returned an empty response.");
     const assistantMessage = { role: "assistant", content: answer };
@@ -412,6 +421,10 @@ async function sendMessage(content, { appendUser = true } = {}) {
     // Replace the pending row so the copy action is available.
     pending.article.remove();
     renderMessage("assistant", answer);
+    if (useAgentMode && Array.isArray(agentMeta?.toolCalls) && agentMeta.toolCalls.length) {
+      const names = [...new Set(agentMeta.toolCalls.map((item) => item.name))].join(", ");
+      showNotice(`Agent completed ${agentMeta.steps} tool step(s): ${names}.`);
+    }
   } catch (error) {
     const message = error.name === "AbortError" ? "Generation stopped." : error.message;
     pending.text.textContent = message;
@@ -570,6 +583,16 @@ searchModeButton?.addEventListener("click", () => {
   searchModeButton.title = searchMode ? "Web search is on for the next answer" : "Search the web before answering";
   showNotice(searchMode ? "Web search enabled: Audora will retrieve live results and use source links." : "Web search disabled.");
 });
+
+agentModeButton?.addEventListener("click", () => {
+  agentMode = !agentMode;
+  agentModeButton.setAttribute("aria-pressed", String(agentMode));
+  agentModeButton.classList.toggle("active", agentMode);
+  agentModeButton.title = agentMode ? "Agent mode is on: bounded multi-step tool use" : "Agent mode: bounded tool use";
+  showNotice(agentMode
+    ? "Agent mode enabled: Audora can choose calculator, current time, and configured web search. It cannot run shell commands or arbitrary code."
+    : "Agent mode disabled. Standard chat is active.");
+});
 thinkingModeButton.addEventListener("click", () => {
   thinkingMode = !thinkingMode;
   thinkingModeButton.setAttribute("aria-pressed", String(thinkingMode));
@@ -620,17 +643,20 @@ fileInput.addEventListener("change", async () => {
 });
 
 document.querySelector("#export-chats").addEventListener("click", () => {
-  if (!chats.length) {
-    showNotice("There are no conversations to export yet.");
-    return;
-  }
-  const payload = JSON.stringify({ exportedAt: new Date().toISOString(), format: "audora-local-chats-v1", conversations: chats }, null, 2);
+  const payload = JSON.stringify({
+    exportedAt: new Date().toISOString(),
+    format: "audora-local-data-v2",
+    conversations: chats,
+    profile,
+    theme: document.documentElement.classList.contains("light") ? "light" : "dark"
+  }, null, 2);
   const url = URL.createObjectURL(new Blob([payload], { type: "application/json" }));
   const link = document.createElement("a");
   link.href = url;
-  link.download = `audora-chats-${new Date().toISOString().slice(0, 10)}.json`;
+  link.download = `audora-local-data-${new Date().toISOString().slice(0, 10)}.json`;
   link.click();
   setTimeout(() => URL.revokeObjectURL(url), 1000);
+  showNotice("Exported your local conversations, profile, and theme. Keep this backup somewhere private.");
 });
 
 document.querySelector("#import-chats")?.addEventListener("click", () => document.querySelector("#import-file-input")?.click());

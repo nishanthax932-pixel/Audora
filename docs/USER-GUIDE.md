@@ -27,7 +27,7 @@ The status badge reports configuration only. It deliberately does not claim that
 
 Conversation history and profile memory are stored in this browser's local storage. They do not automatically follow you to another device or browser. Clearing browser data can remove them, so export important conversations. The current starter does not provide account login, password recovery, cloud chat history, or cross-device synchronization.
 
-The operator controls the model and optional services. Review the operator's privacy notice before entering sensitive information.
+Prompts, selected conversation context, and attached content are sent to the model provider configured by the operator. Search queries go to the configured SearXNG service; search snippets may then be sent to the model provider. Review the operator's privacy notice and the selected providers' terms before entering sensitive information. See [current data handling details](PRIVACY-AND-DATA-HANDLING.md).
 
 ## If Audora cannot answer
 

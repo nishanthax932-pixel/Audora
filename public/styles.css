@@ -236,3 +236,6 @@ body{font-family:Arial,Helvetica,sans-serif}
 .light .composer .attach-button{color:#333!important;border-color:#ccc!important}
 .light .composer .attach-button:hover{background:#eee!important}
 .light .composer #send-button{background:#222;color:#fff}
+
+.composer .agent-mode.active{background:#175b48!important;color:#d8fff1!important;border-color:#25866b!important;box-shadow:0 0 0 2px #25866b33}
+.light .composer .agent-mode.active{background:#d9f4e9!important;color:#13533e!important;border-color:#65b995!important}
