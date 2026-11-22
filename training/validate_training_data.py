@@ -35,9 +35,9 @@ def validate_records(records: list[object]) -> list[str]:
                 errors.append(f"{where}: duplicate id {record_id!r}.")
             seen_ids.add(record_id)
 
-        if record.get("split") not in SPLITS:
+        if not isinstance(record.get("split"), str) or record.get("split") not in SPLITS:
             errors.append(f"{where}: split must be one of {sorted(SPLITS)}.")
-        if record.get("review_status") not in REVIEW_STATES:
+        if not isinstance(record.get("review_status"), str) or record.get("review_status") not in REVIEW_STATES:
             errors.append(f"{where}: review_status must be one of {sorted(REVIEW_STATES)}.")
         if record.get("review_status") != "approved":
             errors.append(f"{where}: only approved records may enter a training/evaluation manifest.")
