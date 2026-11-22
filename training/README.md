@@ -32,7 +32,7 @@ Both scripts require a compatible model/tokenizer chat template and suitable har
 6. Run `python training/train_lora.py`.
 7. Evaluate the adapter against the untouched base on a held-out set before serving it.
 
-## Dataset quality rules
+## Validate a governed manifest\n\nFor a new manifest using the strict provenance contract, run:\n\n\`\`\`bash\npython training/validate_training_data.py path/to/manifest.jsonl\npython -m unittest discover -s training -p 'test_*.py'\n\`\`\`\n\nThe validator checks required provenance fields, approved review status, message shape, unique IDs, and exact duplicates across splits. It cannot verify that a license claim is true, detect personal information, or detect near-duplicates; those still require review and dedicated tooling. Existing starter scripts continue to accept the older prompt/response format, so migrate and validate a governed dataset before using it for serious experiments.\n\n## Dataset quality rules
 
 - Record source, license/permission, split, language, and review status in a dataset manifest.
 - Keep train, validation, and test records separate; do not tune on the test set.
